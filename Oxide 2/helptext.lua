@@ -41,7 +41,6 @@ function PLUGIN:cmdHelp(player)
             self:ChatMessage(player, helptext)
         end
     end
-
     if self.Config.Settings.AllowHelpTextFromOtherPlugins == "true" then
         plugins.CallHook("SendHelpText", util.TableToArray({player}))
     end
