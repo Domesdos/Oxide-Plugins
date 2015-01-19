@@ -1,7 +1,7 @@
 PLUGIN.Title        = "Enhanced Ban System"
 PLUGIN.Description  = "Ban system with advanced features"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(2, 2, 0)
+PLUGIN.Version      = V(2, 2, 1)
 PLUGIN.HasConfig    = true
 PLUGIN.ResourceID   = 693
 
@@ -322,14 +322,22 @@ end
 -- unban player
 -- --------------------------------
 function PLUGIN:UnBan(player, target)
-    for key, value in pairs(BanData) do
+    debug("unban target: "..target)
+    for key, _ in pairs(BanData) do
         if BanData[key].name == target or BanData[key].steamID == target or BanData[key].IP == target then
+            debug("ban found")
             -- Send unban request to RustDB
             if plugin_RustDB then
                 plugin_RustDB:RustDBUnban(BanData[key].steamID)
             end
             -- remove from banlist
+            BanData[key].name = nil
+            BanData[key].steamID = nil
+            BanData[key].IP = nil
+            BanData[key].expiration = nil
+            BanData[key].reason = nil
             BanData[key] = nil
+            debug("bandata nil: "..tostring(BanData[key] == nil))
             self:SaveDataFile()
             -- Output the bans
             if self.Config.Settings.BroadcastBans == "true" then
