@@ -21,24 +21,11 @@ function PLUGIN:LoadDefaultConfig()
     self:SaveConfig()
 end
 
-local function QuoteSafe(string)
-    return UnityEngine.StringExtensions.QuoteSafe(string)
-end
-
-function PLUGIN:ChatMessage(targetPlayer, chatName, msg)
-    if msg then
-        targetPlayer:SendConsoleCommand("chat.add "..QuoteSafe(chatName).." "..QuoteSafe(msg))
-    else
-        msg = chatName
-        targetPlayer:SendConsoleCommand("chat.add SERVER "..QuoteSafe(msg))
-    end
-end
-
 function PLUGIN:cmdHelp(player)
     if not player then return end
     if self.Config.Settings.UseCustomHelpText == "true" then
         for _, helptext in pairs(self.Config.CustomHelpText) do
-            self:ChatMessage(player, helptext)
+            rust.SendChatMessage(player, helptext)
         end
     end
     if self.Config.Settings.AllowHelpTextFromOtherPlugins == "true" then
