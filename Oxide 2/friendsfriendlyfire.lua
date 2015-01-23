@@ -1,7 +1,7 @@
 PLUGIN.Title        = "Friends Friendly Fire"
 PLUGIN.Description  = "Allows you to toggle friendly fire for friends"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(1, 2, 1)
+PLUGIN.Version      = V(1, 3, 0)
 PLUGIN.HasConfig    = true
 PLUGIN.ResourceID   = 687
 
@@ -29,12 +29,11 @@ end
 -- admin permission check
 -- --------------------------------
 local function IsAdmin(player)
-    if player:GetComponent("BaseNetworkable").net.connection.authLevel == 0 then
-        return false
-    end
-    return true
+    return player:GetComponent("BaseNetworkable").net.connection.authLevel > 0
 end
-
+-- --------------------------------
+-- init
+-- --------------------------------
 function PLUGIN:Init()
     if not plugins.Exists("0friendsAPI") then
         error("FriendsAPI not found")
@@ -53,12 +52,16 @@ function PLUGIN:Init()
         end
     end
 end
-
+-- --------------------------------
+-- load the default config
+-- --------------------------------
 function PLUGIN:LoadDefaultConfig()
     self.Config.FriendlyFire = self.Config.FriendlyFire or "true"
     self:SaveConfig()
 end
-
+-- --------------------------------
+-- hook to catch player attacks
+-- --------------------------------
 function PLUGIN:OnPlayerAttack(attacker, hitinfo)
     debug("OnPlayerAttack()")
     if self.Config.FriendlyFire == "false" then
@@ -71,22 +74,25 @@ function PLUGIN:OnPlayerAttack(attacker, hitinfo)
                 local hasFriend = friendsAPI:HasFriend(attackerSteamID, targetSteamID)
                 debug("hasFriend: "..tostring(hasFriend))
                 if hasFriend then
-                    attacker:SendConsoleCommand("chat.add SERVER You cant dmg your friends")
-                    return true
+                    rust.SendChatMessage(attacker, "You cant damage your friend")
+                    hitinfo.damageTypes = new(Rust.DamageTypeList._type, nil)
+                    hitinfo.HitMaterial = 0
                 end
             end
         end
     end
 end
-
+-- --------------------------------
+-- set config vars ingame
+-- --------------------------------
 function PLUGIN:SetConfig(player)
     if not IsAdmin(player) then return false end
     if self.Config.FriendlyFire == "false" then
         self.Config.FriendlyFire = "true"
-        player:ChatMessage("FriendlyFire on")
+        rust.SendChatMessage(player, "FriendlyFire on")
     else
         self.Config.FriendlyFire = "false"
-        player:ChatMessage("FriendlyFire off")
+        rust.SendChatMessage(player, "FriendlyFire off")
     end
     self:SaveConfig()
 end
