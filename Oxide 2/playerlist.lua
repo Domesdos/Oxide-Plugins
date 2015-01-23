@@ -1,14 +1,17 @@
 PLUGIN.Title        = "Players list"
 PLUGIN.Description  = "Allows users to see who or how many people are online"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(1, 3, 1)
+PLUGIN.Version      = V(1, 4, 0)
 PLUGIN.HasConfig    = true
 PLUGIN.ResourceID   = 661
 
 
 function PLUGIN:Init()
-    command.AddChatCommand("who", self.Object, "cmdWho")
+    --command.AddChatCommand("who", self.Object, "cmdWho")
     self:LoadDefaultConfig()
+    for _, cmd in pairs(self.Config.Settings.ChatCommands) do
+        command.AddChatCommand(cmd, self.Object, "cmdWho")
+    end
 end
 
 function PLUGIN:LoadDefaultConfig()
@@ -18,6 +21,7 @@ function PLUGIN:LoadDefaultConfig()
     self.Config.Settings.MaxPlayersPerLine = self.Config.Settings.MaxPlayersPerLine or 8
     self.Config.Settings.SeparateAdmins = self.Config.Settings.SeparateAdmins or "false"
     self.Config.Settings.OnlyShowAdminCount = self.Config.Settings.OnlyShowAdminCount or "false"
+    self.Config.Settings.ChatCommands = self.Config.Settings.ChatCommands or {"who", "online"}
     -- Messages
     self.Config.Messages = self.Config.Messages or {}
     self.Config.Messages.OnePlayerMessage = self.Config.Messages.OnePlayerMessage or "You're the only one online"
@@ -26,31 +30,16 @@ function PLUGIN:LoadDefaultConfig()
     self.Config.Messages.NoAdminMessage = self.Config.Messages.NoAdminMessage or "No admin online"
     self.Config.Messages.AdminCountMessage = self.Config.Messages.AdminCountMessage or "{count} admins online"
     self.Config.Messages.AdminNameMessage = self.Config.Messages.AdminNameMessage or "{count} admins online: "
-    self.Config.Messages.HelpText = self.Config.Messages.HelpText or "use /who to show who's online"
+    self.Config.Messages.HelpText = self.Config.Messages.HelpText or "use /who or /online to show who's online"
 
     self:SaveConfig()
 end
 
-local function QuoteSafe(string)
-    return UnityEngine.StringExtensions.QuoteSafe(string)
-end
-
-function PLUGIN:ChatMessage(targetPlayer, chatName, msg)
-    if msg then
-        targetPlayer:SendConsoleCommand("chat.add "..QuoteSafe(chatName).." "..QuoteSafe(msg))
-    else
-        msg = chatName
-        targetPlayer:SendConsoleCommand("chat.add SERVER "..QuoteSafe(msg))
-    end
-end
 -- --------------------------------
 -- admin permission check
 -- --------------------------------
 local function IsAdmin(player)
-    if player:GetComponent("BaseNetworkable").net.connection.authLevel == 0 then
-        return false
-    end
-    return true
+    return player:GetComponent("BaseNetworkable").net.connection.authLevel > 0
 end
 
 function PLUGIN:cmdWho(player)
@@ -84,7 +73,7 @@ function PLUGIN:cmdWho(player)
         end
     end
     if allCount == 1 then
-        self:ChatMessage(player, self.Config.Messages.OnePlayerMessage)
+        rust.SendChatMessage(player, self.Config.Messages.OnePlayerMessage)
         return
     end
     -- remove comma at the end
@@ -97,22 +86,22 @@ function PLUGIN:cmdWho(player)
     -- Build admin message
     if self.Config.Settings.SeparateAdmins == "true" then
         if adminCount == 0 then
-            self:ChatMessage(player, self.Config.Messages.NoAdminMessage)
+            rust.SendChatMessage(player, self.Config.Messages.NoAdminMessage)
         else
             if self.Config.Settings.OnlyShowAdminCount == "true" then
                 local msg = string.gsub(self.Config.Messages.AdminCountMessage, "{count}", tostring(adminCount))
-                self:ChatMessage(player, msg)
+                rust.SendChatMessage(player, msg)
             else
                 if #adminStringTbl >= 1 then
                     local msg = string.gsub(self.Config.Messages.AdminNameMessage, "{count}", tostring(adminCount))
-                    self:ChatMessage(player, msg)
+                    rust.SendChatMessage(player, msg)
                     for i = 1, #adminStringTbl, 1 do
-                        self:ChatMessage(player, adminStringTbl[i])
+                        rust.SendChatMessage(player, adminStringTbl[i])
                     end
-                    self:ChatMessage(player, adminString)
+                    rust.SendChatMessage(player, adminString)
                 else
                     local msg = string.gsub(self.Config.Messages.AdminNameMessage, "{count}", tostring(adminCount))
-                    self:ChatMessage(player, msg..adminString)
+                    rust.SendChatMessage(player, msg..adminString)
                 end
             end
         end
@@ -120,22 +109,22 @@ function PLUGIN:cmdWho(player)
     -- Build player message
     if self.Config.Settings.OnlyShowPlayerCount == "true" then
         local msg = string.gsub(self.Config.Messages.PlayerCountMessage, "{count}", tostring(playerCount))
-        self:ChatMessage(player, msg)
+        rust.SendChatMessage(player, msg)
     else
         if #playerStringTbl >= 1 then
             local msg = string.gsub(self.Config.Messages.PlayerNameMessage, "{count}", tostring(playerCount))
-            self:ChatMessage(player, msg)
+            rust.SendChatMessage(player, msg)
             for i = 1, #playerStringTbl, 1 do
-                self:ChatMessage(player, playerStringTbl[i])
+                rust.SendChatMessage(player, playerStringTbl[i])
             end
-            self:ChatMessage(player, playerString)
+            rust.SendChatMessage(player, playerString)
         else
             local msg = string.gsub(self.Config.Messages.PlayerNameMessage, "{count}", tostring(playerCount))
-            self:ChatMessage(player, msg..playerString)
+            rust.SendChatMessage(player, msg..playerString)
         end
     end
 end
 
 function PLUGIN:SendHelpText(player)
-    self:ChatMessage(player, self.Config.Messages.HelpText)
+    rust.SendChatMessage(player, self.Config.Messages.HelpText)
 end
