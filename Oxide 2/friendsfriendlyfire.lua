@@ -1,11 +1,11 @@
 PLUGIN.Title        = "Friends Friendly Fire"
 PLUGIN.Description  = "Allows you to toggle friendly fire for friends"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(1, 3, 0)
+PLUGIN.Version      = V(1, 3, 1)
 PLUGIN.HasConfig    = true
 PLUGIN.ResourceID   = 687
 
-local friendsAPI
+
 local debugMode = false
 
 -- --------------------------------
@@ -34,23 +34,18 @@ end
 -- --------------------------------
 -- init
 -- --------------------------------
-function PLUGIN:Init()
-    if not plugins.Exists("0friendsAPI") then
+local friendsAPI
+function PLUGIN:OnServerInitialized()
+    friendsAPI = plugins.Find("0friendsAPI") or false
+    if not friendsAPI then
         error("FriendsAPI not found")
         error("Get it here: http://forum.rustoxide.com/plugins/friends-api.686/")
         return
     end
-    command.AddChatCommand("fff", self.Object, "SetConfig")
+end
+function PLUGIN:Init()
+    command.AddChatCommand("fff", self.Object, "cmdSetConfig")
     self:LoadDefaultConfig()
-    -- Get plugin instance of friendsAPI
-    local pluginList = plugins.GetAll()
-    for i = 0, pluginList.Length - 1 do
-        local pluginTitle = pluginList[i].Object.Title
-        if pluginTitle == "FriendsAPI" then
-            friendsAPI = pluginList[i].Object
-            break
-        end
-    end
 end
 -- --------------------------------
 -- load the default config
@@ -77,6 +72,7 @@ function PLUGIN:OnPlayerAttack(attacker, hitinfo)
                     rust.SendChatMessage(attacker, "You cant damage your friend")
                     hitinfo.damageTypes = new(Rust.DamageTypeList._type, nil)
                     hitinfo.HitMaterial = 0
+                    return true
                 end
             end
         end
@@ -85,7 +81,7 @@ end
 -- --------------------------------
 -- set config vars ingame
 -- --------------------------------
-function PLUGIN:SetConfig(player)
+function PLUGIN:cmdSetConfig(player)
     if not IsAdmin(player) then return false end
     if self.Config.FriendlyFire == "false" then
         self.Config.FriendlyFire = "true"
