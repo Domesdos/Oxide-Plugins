@@ -1,7 +1,7 @@
 PLUGIN.Title        = "Enhanced Ban System"
 PLUGIN.Description  = "Ban system with advanced features"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(2, 2, 1)
+PLUGIN.Version      = V(2, 2, 2)
 PLUGIN.HasConfig    = true
 PLUGIN.ResourceID   = 693
 
@@ -49,27 +49,7 @@ end
 -- admin permission check
 -- --------------------------------
 local function IsAdmin(player)
-    if player:GetComponent("BaseNetworkable").net.connection.authLevel == 0 then
-        return false
-    end
-    return true
-end
--- --------------------------------
--- quote safe string
--- --------------------------------
-local function QuoteSafe(string)
-    return UnityEngine.StringExtensions.QuoteSafe(string)
-end
--- --------------------------------
--- sends a chat message
--- --------------------------------
-function PLUGIN:ChatMessage(targetPlayer, chatName, msg)
-    if msg then
-        targetPlayer:SendConsoleCommand("chat.add "..QuoteSafe(chatName).." "..QuoteSafe(msg))
-    else
-        msg = chatName
-        targetPlayer:SendConsoleCommand("chat.add SERVER "..QuoteSafe(msg))
-    end
+    return player:GetComponent("BaseNetworkable").net.connection.authLevel > 0
 end
 -- --------------------------------
 -- error and debug reporting
@@ -129,16 +109,16 @@ function PLUGIN:cmdBan(player, cmd, args)
     local args = self:ArgsToTable(args, "chat")
     local target, reason, duration = args[1], args[2], args[3]
     if not IsAdmin(player) then
-        self:ChatMessage(player, "You dont have permission to use this command")
+        rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     if not reason then
-        self:ChatMessage(player, "Syntax: \"/ban <name|steamID|ip> <reason> <time[m|h|d] (optional)>\"")
+        rust.SendChatMessage(player, "Syntax: \"/ban <name|steamID|ip> <reason> <time[m|h|d] (optional)>\"")
         return
     end
     local targetPlayer = global.BasePlayer.Find(target)
     if not targetPlayer then
-        self:ChatMessage(player, "Player not found")
+        rust.SendChatMessage(player, "Player not found")
         return
     end
     self:Ban(player, targetPlayer, reason, duration)
@@ -158,7 +138,7 @@ function PLUGIN:ccmdBan(arg)
     local args = self:ArgsToTable(arg, "console")
     local target, reason, duration = args[1], args[2], args[3]
     if player and not IsAdmin(player) then
-        self:ChatMessage(player, "You dont have permission to use this command")
+        rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     if not reason then
@@ -179,11 +159,11 @@ function PLUGIN:cmdUnban(player, cmd, args)
     local args = self:ArgsToTable(args, "chat")
     local target = args[1]
     if not IsAdmin(player) then
-        self:ChatMessage(player, "You dont have permission to use this command")
+        rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     if not target then
-        self:ChatMessage(player, "Syntax: \"/unban <name|steamID|ip>\"")
+        rust.SendChatMessage(player, "Syntax: \"/unban <name|steamID|ip>\"")
         return
     end
     self:UnBan(player, target)
@@ -215,16 +195,16 @@ function PLUGIN:cmdKick(player, cmd, args)
     local args = self:ArgsToTable(args, "chat")
     local target, reason = args[1], args[2]
     if not IsAdmin(player) then
-        self:ChatMessage(player, "You dont have permission to use this command")
+        rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     if not reason then
-        self:ChatMessage(player, "Syntax: \"/kick <name|steamID|ip> <reason>\"")
+        rust.SendChatMessage(player, "Syntax: \"/kick <name|steamID|ip> <reason>\"")
         return
     end
     local targetPlayer = global.BasePlayer.Find(target)
     if not targetPlayer then
-        self:ChatMessage(player, "Player not found")
+        rust.SendChatMessage(player, "Player not found")
         return
     end
     self:Kick(player, targetPlayer, reason)
@@ -261,11 +241,11 @@ function PLUGIN:cmdBanCheck(player, cmd, args)
     local args = self:ArgsToTable(args, "chat")
     local target = args[1]
     if not IsAdmin(player) and self.Config.Settings.CheckUsableByEveryone == "false" then
-        self:ChatMessage(player, "You dont have permission to use this command")
+        rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     if not target then
-        self:ChatMessage(player, "Syntax: \"/bancheck <name|steamID|ip>\"")
+        rust.SendChatMessage(player, "Syntax: \"/bancheck <name|steamID|ip>\"")
         return
     end
     local now = time.GetUnixTimestamp()
@@ -273,7 +253,7 @@ function PLUGIN:cmdBanCheck(player, cmd, args)
         if BanData[key].name == target or BanData[key].steamID == target or BanData[key].IP == target then
             if BanData[key].expiration > now or BanData[key].expiration == 0 then
                 if BanData[key].expiration == 0 then
-                    self:ChatMessage(player, target.." is permanently banned")
+                    rust.SendChatMessage(player, target.." is permanently banned")
                     return
                 else
                     local expiration = BanData[key].expiration
@@ -282,13 +262,13 @@ function PLUGIN:cmdBanCheck(player, cmd, args)
                     local hours = string.format("%02.f", math.floor(bantime / 3600 - (days * 24)))
                     local minutes = string.format("%02.f", math.floor(bantime / 60 - (days * 1440) - (hours * 60)))
                     local seconds = string.format("%02.f", math.floor(bantime - (days * 86400) - (hours * 3600) - (minutes * 60)))
-                    self:ChatMessage(player, target.." is banned for "..tostring(days).." days "..tostring(hours).." hours "..tostring(minutes).." minutes "..tostring(seconds).." seconds")
+                    rust.SendChatMessage(player, target.." is banned for "..tostring(days).." days "..tostring(hours).." hours "..tostring(minutes).." minutes "..tostring(seconds).." seconds")
                     return
                 end
             end
         end
     end
-    self:ChatMessage(player, target.." is not banned")
+    rust.SendChatMessage(player, target.." is not banned")
 end
 -- --------------------------------
 -- kick player
@@ -305,7 +285,7 @@ function PLUGIN:Kick(player, targetPlayer, reason)
         global.ConsoleSystem.Broadcast("chat.add \"SERVER\" \""..targetName.." has been kicked for "..reason)
     else
         if player then
-            self:ChatMessage(player, targetName.." has been kicked for "..reason)
+            rust.SendChatMessage(player, targetName.." has been kicked for "..reason)
         else
             print(targetName.." has been kicked for "..reason)
         end
@@ -344,7 +324,7 @@ function PLUGIN:UnBan(player, target)
                 global.ConsoleSystem.Broadcast("chat.add \"SERVER\" \""..target.." has been unbanned")
             else
                 if player then
-                    self:ChatMessage(player, target.." has been unbanned")
+                    rust.SendChatMessage(player, target.." has been unbanned")
                 else
                     print(target.." has been unbanned")
                 end
@@ -360,7 +340,7 @@ function PLUGIN:UnBan(player, target)
         end
     end
     if player then
-        self:ChatMessage(player, target.." not found in banlist")
+        rust.SendChatMessage(player, target.." not found in banlist")
     else
         print(target.." not found in banlist")
     end
@@ -378,7 +358,7 @@ function PLUGIN:Ban(player, targetPlayer, reason, duration)
         if BanData[key].steamID == targetSteamID then
             if BanData[key].expiration > now or BanData[key].expiration == 0 then
                 if player then
-                    self:ChatMessage(player, targetName.." is already banned!")
+                    rust.SendChatMessage(player, targetName.." is already banned!")
                 else
                     print(targetName.." is already banned!")
                 end
@@ -412,7 +392,7 @@ function PLUGIN:Ban(player, targetPlayer, reason, duration)
             global.ConsoleSystem.Broadcast("chat.add \"SERVER\" \""..targetName.." has been permanently banned\"")
         else
             if player then
-                self:ChatMessage(player, targetName.." has been permanently banned")
+                rust.SendChatMessage(player, targetName.." has been permanently banned")
             else
                 print(targetName.." has been permanently banned")
             end
@@ -428,7 +408,7 @@ function PLUGIN:Ban(player, targetPlayer, reason, duration)
         -- Check if time input is a valid format
         if string.len(duration) < 2 or not string.match(duration, "^%d*[mhd]$") then
             if player then
-                self:ChatMessage(player, "Invalid time format")
+                rust.SendChatMessage(player, "Invalid time format")
             else
                 print("Invalid time format")
             end
@@ -468,7 +448,7 @@ function PLUGIN:Ban(player, targetPlayer, reason, duration)
             global.ConsoleSystem.Broadcast("chat.add \"SERVER\" \""..targetName.." has been banned for "..banTime.." "..timeUnitLong)
         else
             if player then
-                self:ChatMessage(player, targetName.." has been banned for "..banTime.." "..timeUnitLong)
+                rust.SendChatMessage(player, targetName.." has been banned for "..banTime.." "..timeUnitLong)
             else
                 print(targetName.." has been banned for "..banTime.." "..timeUnitLong)
             end
@@ -516,6 +496,6 @@ end
 -- --------------------------------
 function PLUGIN:SendHelpText(player)
     if self.Config.Settings.CheckUsableByEveryone == "true" then
-        self:ChatMessage(player, self.Config.Messages.HelpText)
+        rust.SendChatMessage(player, self.Config.Messages.HelpText)
     end
 end
