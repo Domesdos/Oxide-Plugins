@@ -1,7 +1,7 @@
 PLUGIN.Title        = "FriendsAPI"
 PLUGIN.Description  = "An API to manage friends"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(1, 1, 0)
+PLUGIN.Version      = V(1, 1, 1)
 PLUGIN.HasConfig    = false
 PLUGIN.ResourceID   = 686
 
@@ -23,18 +23,6 @@ function PLUGIN:SaveDataFile()
     datafile.SaveDataTable(DataFile)
 end
 
-local function QuoteSafe(string)
-    return UnityEngine.StringExtensions.QuoteSafe(string)
-end
-
-function PLUGIN:ChatMessage(targetPlayer, chatName, msg)
-    if msg then
-        targetPlayer:SendConsoleCommand("chat.add "..QuoteSafe(chatName).." "..QuoteSafe(msg))
-    else
-        msg = chatName
-        targetPlayer:SendConsoleCommand("chat.add SERVER "..QuoteSafe(msg))
-    end
-end
 
 function PLUGIN:cmdFriend(player, cmd, args)
 if not player then return end
@@ -42,11 +30,11 @@ if not player then return end
     local func, target = args[1], args[2]
     local playerSteamID = rust.UserIDFromPlayer(player)
     if not func or func ~= "add" and func ~= "remove" and func ~= "list" then
-        self:ChatMessage(player, "Syntax: \"/friend <add/remove> <name>\" or \"/friend list\"")
+        rust.SendChatMessage(player, "Syntax: \"/friend <add/remove> <name>\" or \"/friend list\"")
         return
     end
     if func ~= "list" and not target then
-        self:ChatMessage(player, "Syntax: \"/friend <add/remove> <name>\"")
+        rust.SendChatMessage(player, "Syntax: \"/friend <add/remove> <name>\"")
         return
     end
     if func == "list" then
@@ -71,45 +59,45 @@ if not player then return end
             end
             -- output friendlist
             if #friendlistTbl >= 1 then
-                player:ChatMessage("Friends:")
+                rust.SendChatMessage(player, "Friends: ")
                 for i = 1, #friendlistTbl do
-                    self:ChatMessage(player, friendlistTbl[i])
+                    rust.SendChatMessage(player, friendlistTbl[i])
                 end
-                self:ChatMessage(player, friendlistString)
+                rust.SendChatMessage(player, friendlistString)
             else
-                self:ChatMessage(player, "Friends: "..friendlistString)
+                rust.SendChatMessage(player, "Friends: "..friendlistString)
             end
             return
         end
-        self:ChatMessage(player, "You dont have friends :(")
+        rust.SendChatMessage(player, "You dont have friends :(")
         return
     end
     local targetPlayer = global.BasePlayer.Find(target)
     if not targetPlayer then
-        self:ChatMessage(player, "Player not found")
+        rust.SendChatMessage(player, "Player not found")
         return
     end
     local targetName = targetPlayer.displayName
     local targetSteamID = rust.UserIDFromPlayer(targetPlayer)
     if func == "add" then
         if player == targetPlayer then
-            self:ChatMessage(player, "You cant add yourself")
+            rust.SendChatMessage(player, "You cant add yourself")
             return
         end
         local added = self:addFriend(player, targetSteamID)
         if not added then
-            self:ChatMessage(player, targetName.." is already your friend")
+            rust.SendChatMessage(player, targetName.." is already your friend")
         else
-            self:ChatMessage(player, targetName.." is now your friend")
+            rust.SendChatMessage(player, targetName.." is now your friend")
         end
         return
     end
     if func == "remove" then
         local removed = self:removeFriend(playerSteamID, targetSteamID)
         if not removed then
-            self:ChatMessage(player, "You already dont have "..targetName.." on your friendlist")
+            rust.SendChatMessage(player, "You already dont have "..targetName.." on your friendlist")
         else
-            self:ChatMessage(player, targetName.." was removed from your friendlist")
+            rust.SendChatMessage(player, targetName.." was removed from your friendlist")
         end
     end
 end
@@ -268,5 +256,5 @@ function PLUGIN:GetPlayerName(steamID)
 end
 
 function PLUGIN:SendHelpText(player)
-    self:ChatMessage(player, "use \"/friend <add|remove|list> <name>\" to add/remove/list friends")
+    rust.SendChatMessage(player, "use \"/friend <add|remove|list> <name>\" to add/remove/list friends")
 end

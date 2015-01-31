@@ -1,29 +1,17 @@
 PLUGIN.Title = "Private Messaging"
 PLUGIN.Description = "Allows users to chat private with each other"
 PLUGIN.Author = "#Domestos"
-PLUGIN.Version = V(1, 1, 0)
+PLUGIN.Version = V(1, 2, 0)
 PLUGIN.HasConfig = false
 PLUGIN.ResourceID = 659
 
-local pmHistory = {}
 
+local pmHistory = {}
 function PLUGIN:Init()
     command.AddChatCommand("pm", self.Object, "cmdPm")
     command.AddChatCommand("r", self.Object, "cmdReply")
 end
 
-local function QuoteSafe(string)
-    return UnityEngine.StringExtensions.QuoteSafe(string)
-end
-
-function PLUGIN:ChatMessage(targetPlayer, chatName, msg)
-    if msg then
-        targetPlayer:SendConsoleCommand("chat.add "..QuoteSafe(chatName).." "..QuoteSafe(msg))
-    else
-        msg = chatName
-        targetPlayer:SendConsoleCommand("chat.add SERVER "..QuoteSafe(msg))
-    end
-end
 -- --------------------------------
 -- Chat command for pm
 -- --------------------------------
@@ -33,28 +21,27 @@ function PLUGIN:cmdPm(player, cmd, args)
     local target, message, argsOverhead = args[1], args[2], args[3]
     if not args or not message then
         -- no args or no message is given
-        self:ChatMessage(player, "Syntax: \"/pm <name> <message>\"")
+        rust.SendChatMessage(player, "Syntax: \"/pm <name> <message>\"")
         return
     end
     if argsOverhead then
         -- too many args, probably message without brackets
-        self:ChatMessage(player, "You need to use brackets to wrap your message - \"message\"")
+        rust.SendChatMessage(player, "You need to use brackets to wrap your message - \"message\"")
         return
     end
     local targetPlayer = global.BasePlayer.Find(target)
     if not targetPlayer then
-        self:ChatMessage(player, "Player not found")
+        rust.SendChatMessage(player, "Player not found")
         return
     end
     local senderName = player.displayName
     local senderSteamID = rust.UserIDFromPlayer(player)
     local targetName = targetPlayer.displayName
     local targetSteamID = rust.UserIDFromPlayer(targetPlayer)
-    targetPlayer:SendConsoleCommand("chat.add \"PM from "..senderName.."\" \""..message.."\"")
-    player:SendConsoleCommand("chat.add \"PM to "..targetName.."\" \""..message.."\"")
+    rust.SendChatMessage(targetPlayer, "PM from "..senderName, message)
+    rust.SendChatMessage(player, "PM to "..targetName, message)
     pmHistory[targetSteamID] = senderSteamID
 end
-
 -- --------------------------------
 -- Chat command for reply
 -- --------------------------------
@@ -66,28 +53,28 @@ function PLUGIN:cmdReply(player, cmd, args)
     local target, message, argsOverhead = args[1], args[2], args[3]
     if not args then
         -- no args given
-        self:ChatMessage(player, "Syntax: \"/r <name> <message>\" or \"/r <message> to reply to last pm\"")
+        rust.SendChatMessage(player, "Syntax: \"/r <name> <message>\" or \"/r <message> to reply to last pm\"")
         return
     end
     if argsOverhead then
         -- too many args, probably message without brackets
-        self:ChatMessage(player, "You need to use brackets to wrap your message - \"message\"")
+        rust.SendChatMessage(player, "You need to use brackets to wrap your message - \"message\"")
         return
     end
     if not message then
-        -- message is first arg, no target given - reply to last pm recievedl
+        -- message is first arg, no target given - reply to last pm recieved
         local message = target
         if pmHistory[senderSteamID] then
             local targetPlayer = global.BasePlayer.Find(pmHistory[senderSteamID])
             if not targetPlayer then
-                self:ChatMessage(player, "Player is offline")
+                rust.SendChatMessage(player, "Player is offline")
                 return
             end
             local targetName = targetPlayer.displayName
-            targetPlayer:SendConsoleCommand("chat.add \"PM from "..senderName.."\" \""..message.."\"")
-            player:SendConsoleCommand("chat.add \"PM to "..targetName.."\" \""..message.."\"")
+            rust.SendChatMessage(targetPlayer, "PM from "..senderName, message)
+            rust.SendChatMessage(player, "PM to "..targetName, message)
         else
-            self:ChatMessage(player, "Syntax: \"/r <name> <message>\" or \"/r <message> to reply to last pm\"")
+            rust.SendChatMessage(player, "Syntax: \"/r <name> <message>\" or \"/r <message> to reply to last pm\"")
             return
         end
         return
@@ -95,14 +82,13 @@ function PLUGIN:cmdReply(player, cmd, args)
     -- name and message is given
     local targetPlayer = global.BasePlayer.Find(target)
     if not targetPlayer then
-        self:ChatMessage(player, "Player not found")
+        rust.SendChatMessage(player, "Player not found")
         return
     end
     local targetName = targetPlayer.displayName
-    targetPlayer:SendConsoleCommand("chat.add \"PM from "..senderName.."\" \""..message.."\"")
-    player:SendConsoleCommand("chat.add \"PM to "..targetName.."\" \""..message.."\"")
+    rust.SendChatMessage(targetPlayer, "PM from "..senderName, message)
+    rust.SendChatMessage(player, "PM to "..targetName, message)
 end
-
 -- --------------------------------
 -- returns args as a table
 -- --------------------------------
@@ -134,6 +120,6 @@ function PLUGIN:OnPlayerDisconnected(player)
 end
 
 function PLUGIN:SendHelpText(player)
-    self:ChatMessage(player, "use \"/pm <name> <message>\" to pm someone")
-    self:ChatMessage(player, "use \"/r <name (optional)> <message>\" to reply to a pm")
+    rust.SendChatMessage(player, "use \"/pm <name> <message>\" to pm someone")
+    rust.SendChatMessage(player, "use \"/r <name (optional)> <message>\" to reply to a pm")
 end

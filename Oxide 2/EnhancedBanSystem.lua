@@ -1,7 +1,7 @@
 PLUGIN.Title        = "Enhanced Ban System"
 PLUGIN.Description  = "Ban system with advanced features"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(2, 2, 2)
+PLUGIN.Version      = V(2, 2, 3)
 PLUGIN.HasConfig    = true
 PLUGIN.ResourceID   = 693
 
@@ -37,6 +37,7 @@ function PLUGIN:LoadDefaultConfig()
     self.Config.Settings.BroadcastBans = self.Config.Settings.BroadcastBans or "false"
     self.Config.Settings.LogToConsole = self.Config.Settings.LogToConsole or "true"
     self.Config.Settings.CheckUsableByEveryone = self.Config.Settings.CheckUsableByEveryone or "false"
+    self.Config.Settings.ChatName = self.Config.Settings.ChatName or "SERVER"
     -- Messages
     self.Config.Messages = self.Config.Messages or {}
     self.Config.Messages.KickMessage = self.Config.Messages.KickMessage or "An admin kicked you for {reason}"
@@ -282,7 +283,7 @@ function PLUGIN:Kick(player, targetPlayer, reason)
     Network.Net.sv:Kick(targetPlayer.net.connection, kickMsg)
     -- Output the bans
     if self.Config.Settings.BroadcastBans == "true" then
-        global.ConsoleSystem.Broadcast("chat.add \"SERVER\" \""..targetName.." has been kicked for "..reason)
+        rust.BroadcastChat(self.Config.Settings.ChatName, targetName.." has been kicked for "..reason)
     else
         if player then
             rust.SendChatMessage(player, targetName.." has been kicked for "..reason)
@@ -321,7 +322,7 @@ function PLUGIN:UnBan(player, target)
             self:SaveDataFile()
             -- Output the bans
             if self.Config.Settings.BroadcastBans == "true" then
-                global.ConsoleSystem.Broadcast("chat.add \"SERVER\" \""..target.." has been unbanned")
+                rust.BroadcastChat(self.Config.Settings.ChatName, target.." has been unbanned")
             else
                 if player then
                     rust.SendChatMessage(player, target.." has been unbanned")
@@ -389,7 +390,7 @@ function PLUGIN:Ban(player, targetPlayer, reason, duration)
         Network.Net.sv:Kick(targetPlayer.net.connection, BanMsg)
         -- Output bans
         if self.Config.Settings.BroadcastBans == "true" then
-            global.ConsoleSystem.Broadcast("chat.add \"SERVER\" \""..targetName.." has been permanently banned\"")
+            rust.BroadcastChat(self.Config.Settings.ChatName, targetName.." has been permanently banned")
         else
             if player then
                 rust.SendChatMessage(player, targetName.." has been permanently banned")
@@ -445,7 +446,7 @@ function PLUGIN:Ban(player, targetPlayer, reason, duration)
         Network.Net.sv:Kick(targetPlayer.net.connection, BanMsg)
         -- Output bans
         if self.Config.Settings.BroadcastBans == "true" then
-            global.ConsoleSystem.Broadcast("chat.add \"SERVER\" \""..targetName.." has been banned for "..banTime.." "..timeUnitLong)
+            rust.BroadcastChat(self.Config.Settings.ChatName, targetName.." has been banned for "..banTime.." "..timeUnitLong)
         else
             if player then
                 rust.SendChatMessage(player, targetName.." has been banned for "..banTime.." "..timeUnitLong)

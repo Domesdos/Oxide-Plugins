@@ -1,7 +1,7 @@
 PLUGIN.Title = "Custom Chat Commands"
 PLUGIN.Description = "Set completely custom chat commands"
 PLUGIN.Author = "#Domestos"
-PLUGIN.Version = V(2, 1, 2)
+PLUGIN.Version = V(2, 2, 0)
 PLUGIN.HasConfig = true
 PLUGIN.ResourceID = 649
 
@@ -13,10 +13,7 @@ function PLUGIN:Init()
 end
 
 local function IsAdmin(player)
-    if player:GetComponent("BaseNetworkable").net.connection.authLevel == 0 then
-        return false
-    end
-    return true
+    return player:GetComponent("BaseNetworkable").net.connection.authLevel > 0
 end
 
 function PLUGIN:LoadDefaultConfig()
@@ -46,13 +43,13 @@ function PLUGIN:cmdChatCmd(player, cmd, args)
                 if IsAdmin(player) then
                     -- Output the text
                     for k, v in pairs(self.Config.ChatCommands[key].text) do
-                        player:SendConsoleCommand("chat.add \""..self.Config.Settings.ChatName.."\" \""..self.Config.ChatCommands[key].text[k].."\"")
+                        rust.SendChatMessage(player, self.Config.Settings.ChatName, self.Config.ChatCommands[key].text[k])
                     end
                 end
             else
                 -- Command can be used by everyone
                 for k, v in pairs(self.Config.ChatCommands[key].text) do
-                    player:SendConsoleCommand("chat.add \""..self.Config.Settings.ChatName.."\" \""..self.Config.ChatCommands[key].text[k].."\"")
+                    rust.SendChatMessage(player, self.Config.Settings.ChatName, self.Config.ChatCommands[key].text[k])
                 end
             end
         end
@@ -64,10 +61,10 @@ function PLUGIN:SendHelpText(player)
         if self.Config.ChatCommands[key].helptext and self.Config.ChatCommands[key] ~= "" then
             if self.Config.ChatCommands[key].admin then
                 if IsAdmin(player) then
-                    player:SendConsoleCommand("chat.add \""..self.Config.Settings.ChatName.."\" \""..self.Config.ChatCommands[key].helptext.."\"")
+                    rust.SendChatMessage(player, self.Config.Settings.ChatName, self.Config.ChatCommands[key].helptext)
                 end
             else
-                player:SendConsoleCommand("chat.add \""..self.Config.Settings.ChatName.."\" \""..self.Config.ChatCommands[key].helptext.."\"")
+                rust.SendChatMessage(player, self.Config.Settings.ChatName, self.Config.ChatCommands[key].helptext)
             end
         end
     end

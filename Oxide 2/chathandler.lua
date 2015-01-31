@@ -1,7 +1,7 @@
 PLUGIN.Title        = "Chat Handler"
 PLUGIN.Description  = "Many features to help moderate the chat"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(2, 2, 1)
+PLUGIN.Version      = V(2, 3, 0)
 PLUGIN.HasConfig    = true
 PLUGIN.ResourceID   = 707
 
@@ -34,10 +34,7 @@ end
 -- admin permission check
 -- --------------------------------
 local function IsAdmin(player)
-    if player:GetComponent("BaseNetworkable").net.connection.authLevel == 0 then
-        return false
-    end
-    return true
+    return player:GetComponent("BaseNetworkable").net.connection.authLevel > 0
 end
 
 function PLUGIN:LoadDefaultConfig()
@@ -162,33 +159,6 @@ function PLUGIN:ArgsToTable(args, src)
     return argsTbl
 end
 -- --------------------------------
--- quote safe string
--- --------------------------------
-local function QuoteSafe(string)
-    return UnityEngine.StringExtensions.QuoteSafe(string)
-end
--- --------------------------------
--- sends a chat message
--- --------------------------------
-function PLUGIN:ChatMessage(targetPlayer, chatName, msg)
-    if msg then
-        targetPlayer:SendConsoleCommand("chat.add "..QuoteSafe(chatName).." "..QuoteSafe(msg))
-    else
-        msg = chatName
-        targetPlayer:SendConsoleCommand("chat.add SERVER "..QuoteSafe(msg))
-    end
-end
--- --------------------------------
--- broadcasts a message
--- --------------------------------
-function PLUGIN:Broadcast(arg1, arg2)
-    if arg2 then
-        global.ConsoleSystem.Broadcast("chat.add "..QuoteSafe(arg1).." "..QuoteSafe(arg2).."")
-    else
-        global.ConsoleSystem.Broadcast("chat.add SERVER "..QuoteSafe(arg1).."")
-    end
-end
--- --------------------------------
 -- returns (bool)IsMuted, (string)timeMuted
 -- --------------------------------
 function PLUGIN:CheckMute(targetSteamID)
@@ -217,16 +187,16 @@ end
 -- --------------------------------
 function PLUGIN:cmdAdminMode(player)
     if not IsAdmin(player) then
-        self:ChatMessage(player, "You dont have permission to use this command")
+        rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     local steamID = rust.UserIDFromPlayer(player)
     if AdminMode[steamID] then
         AdminMode[steamID] = nil
-        self:ChatMessage(player, "You switched back to player mode")
+        rust.SendChatMessage(player, "You switched back to player mode")
     else
         AdminMode[steamID] = true
-        self:ChatMessage(player, "You switched to admin mode")
+        rust.SendChatMessage(player, "You switched to admin mode")
     end
 end
 -- --------------------------------
@@ -234,15 +204,15 @@ end
 -- --------------------------------
 function PLUGIN:cmdGlobalMute(player)
     if not IsAdmin(player) then
-        self:ChatMessage(player, "You dont have permission to use this command")
+        rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     if not GlobalMute then
         GlobalMute = true
-        self:Broadcast("Chat is now globally muted")
+        rust.BroadcastChat("Chat is now globally muted")
     else
         GlobalMute = false
-        self:Broadcast("Global chatmute is now deactivated")
+        rust.BroadcastChat("Global chatmute is now deactivated")
     end
 end
 -- --------------------------------
@@ -250,18 +220,18 @@ end
 -- --------------------------------
 function PLUGIN:cmdMute(player, cmd, args)
     if not IsAdmin(player) then
-        self:ChatMessage(player, "You dont have permission to use this command")
+        rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     local args = self:ArgsToTable(args, "chat")
     local target, duration = args[1], args[2]
     if not target then
-        self:ChatMessage(player, "Syntax: \"/mute <name/steamID> <time[m|h] (optional)>\"")
+        rust.SendChatMessage(player, "Syntax: \"/mute <name/steamID> <time[m|h] (optional)>\"")
         return
     end
     local targetPlayer = global.BasePlayer.Find(target)
     if not targetPlayer then
-        self:ChatMessage(player, "Player not found")
+        rust.SendChatMessage(player, "Player not found")
         return
     end
     self:Mute(player, targetPlayer, duration)
@@ -301,7 +271,7 @@ function PLUGIN:Mute(player, targetPlayer, duration)
     local isMuted, _ = self:CheckMute(targetSteamID)
     if isMuted then
         if player then
-            self:ChatMessage(player, targetName.." is already muted")
+            rust.SendChatMessage(player, targetName.." is already muted")
         else
             print(targetName.." is already muted")
         end
@@ -316,7 +286,7 @@ function PLUGIN:Mute(player, targetPlayer, duration)
         self:SaveDataFiles()
         -- Send mute notice
         if self.Config.Settings.BroadcastMutes == "true" then
-            self:Broadcast(targetName.." has been muted")
+            rust.BroadcastChat(targetName.." has been muted")
             if not player and self.Config.Settings.Logging.LogToConsole == "false" then
                 print(targetName.." has been muted")
             end
@@ -324,9 +294,9 @@ function PLUGIN:Mute(player, targetPlayer, duration)
             if not player and self.Config.Settings.Logging.LogToConsole == "false" then
                 print(targetName.." has been muted")
             else
-                self:ChatMessage(player, targetName.." has been muted")
+                rust.SendChatMessage(player, targetName.." has been muted")
             end
-            targetPlayer:ChatMessage("You have been muted")
+            rust.SendChatMessage(targetPlayer, "You have been muted")
         end
         -- Send console log
         if self.Config.Settings.Logging.LogToConsole == "true" then
@@ -345,7 +315,7 @@ function PLUGIN:Mute(player, targetPlayer, duration)
         if not player then
             print("Invalid time format")
         else
-            self:ChatMessage(player, "Invalid time format")
+            rust.SendChatMessage(player, "Invalid time format")
         end
         return
     end
@@ -374,13 +344,13 @@ function PLUGIN:Mute(player, targetPlayer, duration)
         if not player and self.Config.Settings.Logging.LogToConsole == "false" then
             print(targetName.." has been muted for "..muteTime.." "..timeUnitLong)
         end
-        self:Broadcast(targetName.." has been muted for "..muteTime.." "..timeUnitLong)
+        rust.BroadcastChat(targetName.." has been muted for "..muteTime.." "..timeUnitLong)
     else
-        targetPlayer:ChatMessage("You have been muted for "..muteTime.." "..timeUnitLong)
+        rust.SendChatMessage(targetPlayer, "You have been muted for "..muteTime.." "..timeUnitLong)
         if not player and self.Config.Settings.Logging.LogToConsole == "false" then
             print(targetName.." has been muted for "..muteTime.." "..timeUnitLong)
         else
-            self:ChatMessage(player, targetName.." has been muted for "..muteTime.." "..timeUnitLong)
+            rust.SendChatMessage(player, targetName.." has been muted for "..muteTime.." "..timeUnitLong)
         end
     end
     -- Send console log
@@ -397,14 +367,14 @@ end
 -- --------------------------------
 function PLUGIN:cmdUnMute(player, cmd, args)
     if not IsAdmin(player) then
-        self:ChatMessage(player, "You dont have permission to use this command")
+        rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     local args = self:ArgsToTable(args, "chat")
     local target = args[1]
     -- Check for valid syntax
     if not target then
-        self:ChatMessage(player, "Syntax: \"/unmute <name|steamID>\" or \"/unmute all\" to clear mutelist")
+        rust.SendChatMessage(player, "Syntax: \"/unmute <name|steamID>\" or \"/unmute all\" to clear mutelist")
         return
     end
     -- Check if "all" is used to clear the whole mutelist
@@ -412,13 +382,13 @@ function PLUGIN:cmdUnMute(player, cmd, args)
         local mutecount = #muteData
         muteData = {}
         self:SaveDataFiles()
-        self:ChatMessage(player, "Cleared "..tostring(mutecount).." entries from mutelist")
+        rust.SendChatMessage(player, "Cleared "..tostring(mutecount).." entries from mutelist")
         return
     end
     -- Try to get target netuser
     local targetPlayer = global.BasePlayer.Find(target)
     if not targetPlayer then
-        self:ChatMessage(player, "Player not found")
+        rust.SendChatMessage(player, "Player not found")
         return
     end
     self:Unmute(player, targetPlayer)
@@ -441,6 +411,14 @@ function PLUGIN:ccmdUnMute(arg)
         print("Syntax: \"player.unmute <name/steamID>\" or \"player.unmute all\" to clear mutelist")
         return
     end
+    -- Check if "all" is used to clear the whole mutelist
+    if target == "all" then
+        local mutecount = #muteData
+        muteData = {}
+        self:SaveDataFiles()
+        rust.SendChatMessage(player, "Cleared "..tostring(mutecount).." entries from mutelist")
+        return
+    end
     local targetPlayer = global.BasePlayer.Find(target)
     if not targetPlayer then
         print("Player not found")
@@ -460,16 +438,16 @@ function PLUGIN:Unmute(player, targetPlayer)
         self:SaveDataFiles()
         -- Send unmute notice
         if self.Config.Settings.BroadcastMutes == "true" then
-            self:Broadcast(targetName.." has been unmuted")
+            rust.BroadcastChat(targetName.." has been unmuted")
             if not player and self.Config.Settings.Logging.LogToConsole == "false" then
                 print(targetName.." has been unmuted")
             end
         else
-            targetPlayer:ChatMessage("You have been unmuted")
+            rust.SendChatMessage(targetPlayer, "You have been unmuted")
             if not player and self.Config.Settings.Logging.LogToConsole == "false" then
                 print(targetName.." has been unmuted")
             else
-                self:ChatMessage(player, targetName.." has been unmuted")
+                rust.SendChatMessage(player, targetName.." has been unmuted")
             end
         end
         -- Send console log
@@ -485,7 +463,7 @@ function PLUGIN:Unmute(player, targetPlayer)
     if not player then
         print(targetName.." is not muted")
     else
-        self:ChatMessage(player, targetName.." is not muted")
+        rust.SendChatMessage(player, targetName.." is not muted")
     end
 end
 -- --------------------------------
@@ -498,7 +476,7 @@ function PLUGIN:OnRunCommand(arg)
     local msg = arg:GetString(0, "text")
     local player = arg.connection.player
     if cmd == "chat.say" and string.sub(msg, 1, 1) ~= "/" then
-        local blockChat = self:OnPlayerChat(player, msg)
+        local blockChat = self:HandlePlayerChat(player, msg)
         if blockChat then
             return true
         end
@@ -508,16 +486,16 @@ end
 -- handles chat messages
 -- returns true if chat should be blocked
 -- --------------------------------
-function PLUGIN:OnPlayerChat(player, msg)
+function PLUGIN:HandlePlayerChat(player, msg)
     local steamID = rust.UserIDFromPlayer(player)
     -- Spam prevention
     if self.Config.Settings.AntiSpam.EnableAntiSpam == "true" then
         local isSpam, punishTime = self:AntiSpamCheck(player)
         if isSpam then
-            self:ChatMessage(player, "Auto mute: "..punishTime.." for spam")
-            timer.Once(4, function() self:ChatMessage(player, "If you keep spamming your punishment will raise") end)
+            rust.SendChatMessage(player, "Auto mute: "..punishTime.." for spam")
+            timer.Once(4, function() rust.SendChatMessage(player, "If you keep spamming your punishment will raise") end)
             if self.Config.Settings.BroadcastMutes == "true" then
-                self:Broadcast(player.displayName.." auto mute: "..punishTime.." for spam")
+                rust.BroadcastChat(player.displayName.." auto mute: "..punishTime.." for spam")
             end
             if self.Config.Settings.Logging.LogToConsole == "true" then
                 print(self.Title..": "..player.displayName.." got a "..punishTime.." auto mute for spam")
@@ -532,7 +510,7 @@ function PLUGIN:OnPlayerChat(player, msg)
         if self.Config.Settings.Logging.LogBlockedMessages == "true" then
             print("[CHAT]"..prefix.." "..player.displayName..": "..msg)
         end
-        self:ChatMessage(player, error)
+        rust.SendChatMessage(player, error)
         return true
     end
     -- Chat is ok and not blocked
@@ -691,7 +669,7 @@ end
 -- --------------------------------
 function PLUGIN:SendChat(player, name, msg)
     -- Broadcast chat ingame
-    self:Broadcast(name, msg)
+    rust.BroadcastChat(name, msg)
     -- Log to Rusty chat stream
     local arr = util.TableToArray({name..": "..msg})
     UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, arr)
@@ -732,15 +710,15 @@ end
 -- --------------------------------
 function PLUGIN:cmdHistory(player)
     if #ChatHistory > 0 then
-        player:SendConsoleCommand("chat.add \"ChatHistory\" \"----------\"")
+        rust.SendChatMessage(player, "ChatHistory", "----------")
         local i = 1
         while ChatHistory[i] do
-            player:SendConsoleCommand("chat.add "..UnityEngine.StringExtensions.QuoteSafe(ChatHistory[i].name).." "..UnityEngine.StringExtensions.QuoteSafe(ChatHistory[i].msg).."")
+            rust.SendChatMessage(player, ChatHistory[i].name, ChatHistory[i].msg)
             i = i + 1
         end
-        player:SendConsoleCommand("chat.add \"ChatHistory\" \"----------\"")
+        rust.SendChatMessage(player, "ChatHistory", "----------")
     else
-        player:SendConsoleCommand("chat.add \"ChatHistory\" \"No history found\"")
+        rust.SendChatMessage(player, "ChatHistory", "No history found")
     end
 end
 -- --------------------------------
@@ -760,43 +738,43 @@ function PLUGIN:cmdEditWordFilter(player, cmd, args)
     local func, word, replacement = args[1], args[2], args[3]
     if not func or func ~= "add" and func ~= "remove" and func ~= "list" then
         if not IsAdmin(player) then
-            self:ChatMessage(player, "Syntax \"/wordfilter list\"")
+            rust.SendChatMessage(player, "Syntax \"/wordfilter list\"")
         else
-            self:ChatMessage(player, "Syntax: \"/wordfilter add <word> <replacement>\" or \"/wordfilter remove <word>\"")
+            rust.SendChatMessage(player, "Syntax: \"/wordfilter add <word> <replacement>\" or \"/wordfilter remove <word>\"")
         end
         return
     end
     if func ~= "list" and not IsAdmin(player) then
-        self:ChatMessage(player, "You dont have permission to use this command")
+        rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     if func == "add" then
         if not replacement then
-            self:ChatMessage(player, "Syntax: \"/wordfilter add <word> <replacement>\"")
+            rust.SendChatMessage(player, "Syntax: \"/wordfilter add <word> <replacement>\"")
             return
         end
         local first, last = string.find(string.lower(replacement), string.lower(word))
         if first then
-            self:ChatMessage(player, "Error: "..replacement.." contains the word "..word)
+            rust.SendChatMessage(player, "Error: "..replacement.." contains the word "..word)
             return
         else
             self.Config.WordFilter[word] = replacement
             self:SaveConfig()
-            self:ChatMessage(player, "WordFilter added. \""..word.."\" will now be replaced with \""..replacement.."\"")
+            rust.SendChatMessage(player, "WordFilter added. \""..word.."\" will now be replaced with \""..replacement.."\"")
         end
         return
     end
     if func == "remove" then
         if not word then
-            self:ChatMessage(player, "Syntax: \"/wordfilter remove <word>\"")
+            rust.SendChatMessage(player, "Syntax: \"/wordfilter remove <word>\"")
             return
         end
         if self.Config.WordFilter[word] then
             self.Config.WordFilter[word] = nil
             self:SaveConfig()
-            self:ChatMessage(player, "\""..word.."\" successfully removed from the word filter")
+            rust.SendChatMessage(player, "\""..word.."\" successfully removed from the word filter")
         else
-            self:ChatMessage(player, "No filter for \""..word.."\" found")
+            rust.SendChatMessage(player, "No filter for \""..word.."\" found")
         end
         return
     end
@@ -805,7 +783,7 @@ function PLUGIN:cmdEditWordFilter(player, cmd, args)
         for key, value in pairs(self.Config.WordFilter) do
             wordFilterList = wordFilterList..key..", "
         end
-        self:ChatMessage(player, "Blacklisted words: "..wordFilterList)
+        rust.SendChatMessage(player, "Blacklisted words: "..wordFilterList)
     end
 end
 -- --------------------------------
@@ -813,9 +791,9 @@ end
 -- --------------------------------
 function PLUGIN:SendHelpText(player)
     if self.Config.Settings.EnableChatHistory == "true" then
-        self:ChatMessage(player, self.Config.Settings.HelpText.ChatHistory)
+        rust.SendChatMessage(player, self.Config.Settings.HelpText.ChatHistory)
     end
     if self.Config.Settings.EnableWordFilter == "true" then
-        self:ChatMessage(player, self.Config.Settings.HelpText.Wordfilter)
+        rust.SendChatMessage(player, self.Config.Settings.HelpText.Wordfilter)
     end
 end
