@@ -1,7 +1,7 @@
 PLUGIN.Title        = "Chat Handler"
 PLUGIN.Description  = "Many features to help moderate the chat"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(2, 3, 1)
+PLUGIN.Version      = V(2, 3, 3)
 PLUGIN.HasConfig    = true
 PLUGIN.ResourceID   = 707
 
@@ -36,6 +36,22 @@ end
 local function IsAdmin(player)
     return player:GetComponent("BaseNetworkable").net.connection.authLevel > 0
 end
+-- --------------------------------
+-- workaround for avatars and colored names
+-- --------------------------------
+function PLUGIN:BroadcastChat(player, name, msg)
+    local steamID = rust.UserIDFromPlayer(player)
+    local color = self.Config.Settings.NameColor.NormalUser
+    if IsAdmin(player) then
+        color = self.Config.Settings.NameColor.Admin
+    end
+    if name == self.Config.Settings.AdminMode.AdminChatName then
+        color = self.Config.Settings.NameColor.AdminMode
+        global.ConsoleSystem.Broadcast("chat.add", 0, "<color="..color..">"..name.."</color> "..msg)
+    else
+        global.ConsoleSystem.Broadcast("chat.add", steamID, "<color="..color..">"..player.displayName.."</color> "..msg)
+    end
+end
 
 function PLUGIN:LoadDefaultConfig()
     -- Config settings
@@ -45,6 +61,11 @@ function PLUGIN:LoadDefaultConfig()
     self.Config.Settings.EnableWordFilter = self.Config.Settings.EnableWordFilter or "false"
     self.Config.Settings.EnableChatHistory = self.Config.Settings.EnableChatHistory or "true"
     self.Config.Settings.ChatHistoryMaxLines = self.Config.Settings.ChatHistoryMaxLines or 10
+    -- Name colors
+    self.Config.Settings.NameColor = self.Config.Settings.NameColor or {}
+    self.Config.Settings.NameColor.NormalUser = self.Config.Settings.NameColor.NormalUser or "#5af"
+    self.Config.Settings.NameColor.Admin = self.Config.Settings.NameColor.Admin or "#5af"
+    self.Config.Settings.NameColor.AdminMode = self.Config.Settings.NameColor.AdminMode or "#ff8000"
     -- Logging settings
     self.Config.Settings.Logging = self.Config.Settings.Logging or {}
     self.Config.Settings.Logging.LogToConsole = self.Config.Settings.Logging.LogToConsole or "true"
@@ -669,7 +690,9 @@ end
 -- --------------------------------
 function PLUGIN:SendChat(player, name, msg)
     -- Broadcast chat ingame
-    rust.BroadcastChat(name, msg)
+    -- rust.BroadcastChat(name, msg)
+    self:BroadcastChat(player, name, msg)
+
     -- Log to Rusty chat stream
     local arr = util.TableToArray({name..": "..msg})
     UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, arr)
