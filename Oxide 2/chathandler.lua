@@ -1,7 +1,7 @@
 PLUGIN.Title        = "Chat Handler"
 PLUGIN.Description  = "Many features to help moderate the chat"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(2, 3, 0)
+PLUGIN.Version      = V(2, 3, 1)
 PLUGIN.HasConfig    = true
 PLUGIN.ResourceID   = 707
 
@@ -475,7 +475,7 @@ function PLUGIN:OnRunCommand(arg)
     local cmd = arg.cmd.namefull
     local msg = arg:GetString(0, "text")
     local player = arg.connection.player
-    if cmd == "chat.say" and string.sub(msg, 1, 1) ~= "/" then
+    if cmd == "chat.say" and string.sub(msg, 1, 1) ~= "/" and msg ~= "" then
         local blockChat = self:HandlePlayerChat(player, msg)
         if blockChat then
             return true
