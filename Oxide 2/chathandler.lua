@@ -1,13 +1,21 @@
 PLUGIN.Title        = "Chat Handler"
 PLUGIN.Description  = "Many features to help moderate the chat"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(2, 3, 3)
+PLUGIN.Version      = V(2, 3, 4)
 PLUGIN.HasConfig    = true
 PLUGIN.ResourceID   = 707
 
 local debugMode = false
 
-
+-- --------------------------------
+-- declare some plugin wide vars
+-- --------------------------------
+local muteData, spamData = {}, {}
+local MuteList = "chathandler-mutelist"
+local SpamList = "chathandler-spamlist"
+local AntiSpam, ChatHistory, AdminMode = {}, {}, {}
+local GlobalMute = false
+-- --------------------------------
 function PLUGIN:Init()
     self:LoadDefaultConfig()
     self:LoadChatCommands()
@@ -45,7 +53,7 @@ function PLUGIN:BroadcastChat(player, name, msg)
     if IsAdmin(player) then
         color = self.Config.Settings.NameColor.Admin
     end
-    if name == self.Config.Settings.AdminMode.AdminChatName then
+    if AdminMode[steamID] then
         color = self.Config.Settings.NameColor.AdminMode
         global.ConsoleSystem.Broadcast("chat.add", 0, "<color="..color..">"..name.."</color> "..msg)
     else
@@ -70,7 +78,6 @@ function PLUGIN:LoadDefaultConfig()
     self.Config.Settings.Logging = self.Config.Settings.Logging or {}
     self.Config.Settings.Logging.LogToConsole = self.Config.Settings.Logging.LogToConsole or "true"
     self.Config.Settings.Logging.LogBlockedMessages = self.Config.Settings.Logging.LogBlockedMessages or "true"
-    self.Config.Settings.Logging.LogChatToOxide = self.Config.Settings.Logging.LogChatToOxide or "true"
     -- Admin mode settings
     self.Config.Settings.AdminMode = self.Config.Settings.AdminMode or {}
     self.Config.Settings.AdminMode.ChatCommand = self.Config.Settings.AdminMode.ChatCommand or "/admin"
@@ -125,15 +132,6 @@ function PLUGIN:LoadChatCommands()
     command.AddConsoleCommand("player.mute", self.Object, "ccmdMute")
     command.AddConsoleCommand("player.unmute", self.Object, "ccmdUnMute")
 end
-
--- --------------------------------
--- declare some plugin wide vars
--- --------------------------------
-local muteData, spamData = {}, {}
-local MuteList = "chathandler-mutelist"
-local SpamList = "chathandler-spamlist"
-local AntiSpam, ChatHistory, AdminMode = {}, {}, {}
-local GlobalMute = false
 -- --------------------------------
 -- handles data files
 -- --------------------------------
@@ -689,19 +687,23 @@ end
 -- sends and logs chat messages
 -- --------------------------------
 function PLUGIN:SendChat(player, name, msg)
+    local steamID = rust.UserIDFromPlayer(player)
     -- Broadcast chat ingame
-    -- rust.BroadcastChat(name, msg)
     self:BroadcastChat(player, name, msg)
-
-    -- Log to Rusty chat stream
-    local arr = util.TableToArray({name..": "..msg})
-    UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, arr)
-    -- Log to Oxide log file
-    if self.Config.Settings.Logging.LogChatToOxide == "true" then
-        print("[CHAT] "..name..": "..msg)
+    -- Log chat to console
+    global.ServerConsole.PrintColoured(System.ConsoleColor.DarkYellow, name..": ", System.ConsoleColor.DarkGreen, msg)
+    -- Log chat to Rusty chat stream
+    UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({"[CHAT] "..name..": "..msg}))
+    -- Log chat to log file
+    global.server.Log("Log.Chat.txt", steamID.."/"..name..": "..msg.."\n")
+    -- Log chat history
+    if self.Config.Settings.EnableChatHistory == "true" then
+        self:InsertHistory(name, msg)
     end
-    -- Log to Webchat if installed
+
+
     --[[
+    -- Log to Webchat if installed
     if(self.webchatPlugin ~= nil) then
         local timestamp = util.GetTime()
         local steam64 = rust.GetLongUserID(netuser)
@@ -715,10 +717,6 @@ function PLUGIN:SendChat(player, name, msg)
         self.webchatPlugin:SendChat()
     end
     ]]--
-    -- Log chat history
-    if self.Config.Settings.EnableChatHistory == "true" then
-        self:InsertHistory(name, msg)
-    end
 end
 -- --------------------------------
 -- remove data on disconnect
