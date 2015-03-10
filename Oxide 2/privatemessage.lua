@@ -1,7 +1,7 @@
 PLUGIN.Title = "Private Messaging"
 PLUGIN.Description = "Allows users to chat private with each other"
 PLUGIN.Author = "#Domestos"
-PLUGIN.Version = V(1, 2, 0)
+PLUGIN.Version = V(1, 2, 3)
 PLUGIN.HasConfig = false
 PLUGIN.ResourceID = 659
 
@@ -18,15 +18,15 @@ end
 function PLUGIN:cmdPm(player, cmd, args)
     if not player then return end
     local args = self:ArgsToTable(args, "chat")
-    local target, message, argsOverhead = args[1], args[2], args[3]
-    if not args or not message then
-        -- no args or no message is given
-        rust.SendChatMessage(player, "Syntax: \"/pm <name> <message>\"")
-        return
+    local target, message = args[1], ""
+    local i = 2
+    while args[i] do
+        message = message..args[i].." "
+        i = i + 1
     end
-    if argsOverhead then
-        -- too many args, probably message without brackets
-        rust.SendChatMessage(player, "You need to use brackets to wrap your message - \"message\"")
+    if not target or message == "" then
+        -- no target or no message is given
+        rust.SendChatMessage(player, "Syntax: /pm <name> <message>")
         return
     end
     local targetPlayer = global.BasePlayer.Find(target)
@@ -38,8 +38,8 @@ function PLUGIN:cmdPm(player, cmd, args)
     local senderSteamID = rust.UserIDFromPlayer(player)
     local targetName = targetPlayer.displayName
     local targetSteamID = rust.UserIDFromPlayer(targetPlayer)
-    rust.SendChatMessage(targetPlayer, "PM from "..senderName, message)
-    rust.SendChatMessage(player, "PM to "..targetName, message)
+    rust.SendChatMessage(targetPlayer, "<color=#ff00ff>PM from "..senderName.."</color>", message, senderSteamID)
+    rust.SendChatMessage(player, "<color=#ff00ff>PM to "..targetName.."</color>", message, senderSteamID)
     pmHistory[targetSteamID] = senderSteamID
 end
 -- --------------------------------
@@ -50,44 +50,30 @@ function PLUGIN:cmdReply(player, cmd, args)
     local senderName = player.displayName
     local senderSteamID = rust.UserIDFromPlayer(player)
     local args = self:ArgsToTable(args, "chat")
-    local target, message, argsOverhead = args[1], args[2], args[3]
-    if not args then
+    local message = ""
+    local i = 1
+    while args[i] do
+        message = message..args[i].." "
+        i = i + 1
+    end
+    if message == "" then
         -- no args given
-        rust.SendChatMessage(player, "Syntax: \"/r <name> <message>\" or \"/r <message> to reply to last pm\"")
+        rust.SendChatMessage(player, "Syntax: /r <message> to reply to last pm")
         return
     end
-    if argsOverhead then
-        -- too many args, probably message without brackets
-        rust.SendChatMessage(player, "You need to use brackets to wrap your message - \"message\"")
-        return
-    end
-    if not message then
-        -- message is first arg, no target given - reply to last pm recieved
-        local message = target
-        if pmHistory[senderSteamID] then
-            local targetPlayer = global.BasePlayer.Find(pmHistory[senderSteamID])
-            if not targetPlayer then
-                rust.SendChatMessage(player, "Player is offline")
-                return
-            end
-            local targetName = targetPlayer.displayName
-            rust.SendChatMessage(targetPlayer, "PM from "..senderName, message)
-            rust.SendChatMessage(player, "PM to "..targetName, message)
-        else
-            rust.SendChatMessage(player, "Syntax: \"/r <name> <message>\" or \"/r <message> to reply to last pm\"")
+    if pmHistory[senderSteamID] then
+        local targetPlayer = global.BasePlayer.Find(pmHistory[senderSteamID])
+        if not targetPlayer then
+            rust.SendChatMessage(player, "Player is offline")
             return
         end
+        local targetName = targetPlayer.displayName
+        rust.SendChatMessage(targetPlayer, "<color=#ff00ff>PM from "..senderName.."</color>", message, senderSteamID)
+        rust.SendChatMessage(player, "<color=#ff00ff>PM to "..targetName.."</color>", message, senderSteamID)
+    else
+        rust.SendChatMessage(player, "No PM found to reply to")
         return
     end
-    -- name and message is given
-    local targetPlayer = global.BasePlayer.Find(target)
-    if not targetPlayer then
-        rust.SendChatMessage(player, "Player not found")
-        return
-    end
-    local targetName = targetPlayer.displayName
-    rust.SendChatMessage(targetPlayer, "PM from "..senderName, message)
-    rust.SendChatMessage(player, "PM to "..targetName, message)
 end
 -- --------------------------------
 -- returns args as a table
@@ -120,6 +106,6 @@ function PLUGIN:OnPlayerDisconnected(player)
 end
 
 function PLUGIN:SendHelpText(player)
-    rust.SendChatMessage(player, "use \"/pm <name> <message>\" to pm someone")
-    rust.SendChatMessage(player, "use \"/r <name (optional)> <message>\" to reply to a pm")
+    rust.SendChatMessage(player, "use /pm <name> <message> to pm someone")
+    rust.SendChatMessage(player, "use /r <message> to reply to the last pm")
 end
