@@ -1,7 +1,7 @@
 PLUGIN.Title        = "Chat Handler"
 PLUGIN.Description  = "Many features to help moderate the chat"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(2, 4, 0)
+PLUGIN.Version      = V(2, 5, 0)
 PLUGIN.HasConfig    = true
 PLUGIN.ResourceID   = 707
 
@@ -26,6 +26,7 @@ function PLUGIN:Init()
     self:LoadChatCommands()
     self:LoadDataFiles()
     self:LoadLocalization()
+    self:RegisterPermissions()
 end
 -- --------------------------------
 -- error and debug reporting
@@ -62,14 +63,40 @@ end
 -- --------------------------------
 -- prints to server console
 -- --------------------------------
-local function printConsole(msg)
+local function printToConsole(msg)
     global.ServerConsole.PrintColoured(System.ConsoleColor.Cyan, msg)
 end
 -- --------------------------------
--- prints to server console
+-- prints to log file
 -- --------------------------------
-local function printFile(msg)
+local function printToFile(msg)
     global.server.Log(LogFile, msg.."\n")
+end
+-- --------------------------------
+-- splits chat messages longer than 80 characters into multilines
+-- --------------------------------
+local function splitLongMessages(msg, maxCharsPerLine)
+    local length = string.len(msg)
+    local msgTbl = {}
+    if length > 128 then
+        msg = string.sub(msg, 1, 128)
+    end
+    if length > maxCharsPerLine then
+        while length > maxCharsPerLine do
+            local subStr = string.sub(msg, 1, maxCharsPerLine)
+            local first, last = string.find(string.reverse(subStr), " ")
+            if first then
+                subStr = string.sub(subStr, 1, -first)
+            end
+            table.insert(msgTbl, subStr)
+            msg = string.sub(msg, string.len(subStr) + 1)
+            length = string.len(msg)
+        end
+        table.insert(msgTbl, msg)
+    else
+        table.insert(msgTbl, msg)
+    end
+    return msgTbl
 end
 -- --------------------------------
 -- generates default config
@@ -79,6 +106,7 @@ function PLUGIN:LoadDefaultConfig()
     -- General Settings
     self.Config.Settings.General                        = self.Config.Settings.General or {}
     self.Config.Settings.General.Language               = self.Config.Settings.General.Language or "en"
+    self.Config.Settings.General.MaxCharsPerLine        = self.Config.Settings.General.MaxCharsPerLine or 64
     self.Config.Settings.General.BroadcastMutes         = self.Config.Settings.General.BroadcastMutes or self.Config.Settings.BroadcastMutes or "true"
     self.Config.Settings.General.BlockServerAds         = self.Config.Settings.General.BlockServerAds or self.Config.Settings.BlockServerAds or "true"
     self.Config.Settings.General.AllowedIPsToPost       = self.Config.Settings.General.AllowedIPsToPost or self.Config.AllowedIPsToPost or {}
@@ -99,7 +127,6 @@ function PLUGIN:LoadDefaultConfig()
     -- Name colors
     self.Config.Settings.NameColor                      = self.Config.Settings.NameColor or {}
     self.Config.Settings.NameColor.NormalUser           = self.Config.Settings.NameColor.NormalUser or "#5af"
-    self.Config.Settings.NameColor.Admin                = self.Config.Settings.NameColor.Admin or "#5af"
     self.Config.Settings.NameColor.AdminMode            = self.Config.Settings.NameColor.AdminMode or "#ff8000"
     -- Logging settings
     self.Config.Settings.Logging                        = self.Config.Settings.Logging or {}
@@ -115,6 +142,39 @@ function PLUGIN:LoadDefaultConfig()
     self.Config.Settings.AntiSpam.EnableAntiSpam        = self.Config.Settings.AntiSpam.EnableAntiSpam or "true"
     self.Config.Settings.AntiSpam.MaxLines              = self.Config.Settings.AntiSpam.MaxLines or 4
     self.Config.Settings.AntiSpam.TimeFrame             = self.Config.Settings.AntiSpam.TimeFrame or 6
+    -- Group settings
+    self.Config.Settings.Groups                         = self.Config.Settings.Groups or {}
+    self.Config.Settings.Groups.EnableGroups            = self.Config.Settings.Groups.EnableGroups or "false"
+    self.Config.Settings.Groups.PrefixPosition          = self.Config.Settings.Groups.PrefixPosition or "left"
+    self.Config.Settings.Groups.ColorNamesOnly          = self.Config.Settings.Groups.ColorNamesOnly or "true"
+    -- Check if PrefixPosition setting is valid
+    if self.Config.Settings.Groups.PrefixPosition ~= "left" and self.Config.Settings.Groups.PrefixPosition ~= "right" then
+        self.Config.Settings.Groups.PrefixPosition = "left"
+    end
+    -- Chatgroups
+    self.Config.ChatGroups = self.Config.ChatGroups or {
+        ["Donator"] = {
+            ["Permission"] = "donator",
+            ["Prefix"] = "[$$$]",
+            ["Color"] = "#06DCFB",
+            ["ShowPrefix"] = true,
+            ["ShowColor"] = true
+        },
+        ["VIP"] = {
+            ["Permission"] = "vip",
+            ["Prefix"] = "[VIP]",
+            ["Color"] = "#59ff4a",
+            ["ShowPrefix"] = true,
+            ["ShowColor"] = true
+        },
+        ["Admin"] = {
+            ["Permission"] = "admin",
+            ["Prefix"] = "[Admin]",
+            ["Color"] = "#FFA04A",
+            ["ShowPrefix"] = true,
+            ["ShowColor"] = true
+        }
+    }
     -- Wordfilter
     self.Config.WordFilter = self.Config.WordFilter or {
         ["bitch"] = "sweety",
@@ -127,7 +187,7 @@ function PLUGIN:LoadDefaultConfig()
             local first, _ = string.find(string.lower(value), string.lower(key))
             if first then
                 self.Config.WordFilter[key] = nil
-                error("Config error in word filter: [\""..key.."\":\""..value.."\"] both contain the same word")
+                error("Config error in wordfilter: [\""..key.."\":\""..value.."\"] both contain the same word")
                 error("[\""..key.."\":\""..value.."\"] was removed from word filter")
             end
         end
@@ -144,6 +204,8 @@ function PLUGIN:LoadDefaultConfig()
     self.Config.Settings.ChatHistoryMaxLines = nil
     self.Config.Settings.AdminMode.ChatCommand = nil
     self.Config.Settings.HelpText = nil
+        -- removed in v2.5
+    self.Config.Settings.NameColor.Admin = nil
     --
     self:SaveConfig()
 end
@@ -199,6 +261,16 @@ function PLUGIN:LoadLocalization()
     langString = langData.Localization[self.Config.Settings.General.Language]
 end
 -- --------------------------------
+-- register all permissions for group system
+-- --------------------------------
+function PLUGIN:RegisterPermissions()
+    if self.Config.Settings.Groups.EnableGroups == "true" then
+        for key, _ in pairs(self.Config.ChatGroups) do
+            permission.RegisterPermission(self.Config.ChatGroups[key].Permission, self.Object)
+        end
+    end
+end
+-- --------------------------------
 -- removes expired mutes from the mutelist
 -- --------------------------------
 function PLUGIN:CleanUpMuteList()
@@ -215,15 +287,10 @@ end
 -- --------------------------------
 function PLUGIN:BroadcastChat(player, name, msg)
     local steamID = rust.UserIDFromPlayer(player)
-    local color = self.Config.Settings.NameColor.NormalUser
-    if IsAdmin(player) then
-        color = self.Config.Settings.NameColor.Admin
-    end
     if AdminMode[steamID] then
-        color = self.Config.Settings.NameColor.AdminMode
-        global.ConsoleSystem.Broadcast("chat.add", 0, "<color="..color..">"..name.."</color> "..msg)
+        global.ConsoleSystem.Broadcast("chat.add", 0, name..": "..msg)
     else
-        global.ConsoleSystem.Broadcast("chat.add", steamID, "<color="..color..">"..player.displayName.."</color> "..msg)
+        global.ConsoleSystem.Broadcast("chat.add", steamID, name..": "..msg)
     end
 end
 -- --------------------------------
@@ -345,7 +412,7 @@ function PLUGIN:ccmdMute(arg)
         if F1Console then
             arg:ReplyWith("Syntax: player.mute <name/steamID> <time[m/h] (optional)>")
         else
-            printConsole("Syntax: player.mute <name/steamID> <time[m/h] (optional)>")
+            printToConsole("Syntax: player.mute <name/steamID> <time[m/h] (optional)>")
         end
         return
     end
@@ -354,7 +421,7 @@ function PLUGIN:ccmdMute(arg)
         if F1Console then
             arg:ReplyWith(langString.AdminNotifications["PlayerNotFound"])
         else
-            printConsole(langString.AdminNotifications["PlayerNotFound"])
+            printToConsole(langString.AdminNotifications["PlayerNotFound"])
         end
         return
     end
@@ -378,7 +445,7 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
             arg:ReplyWith(buildOutput(langString.AdminNotifications["AlreadyMuted"], {"{name}"}, {targetName}))
         end
         if srvConsole then
-            printConsole(buildOutput(langString.AdminNotifications["AlreadyMuted"], {"{name}"}, {targetName}))
+            printToConsole(buildOutput(langString.AdminNotifications["AlreadyMuted"], {"{name}"}, {targetName}))
         end
         if chatCmd then
             rust.SendChatMessage(player, buildOutput(langString.AdminNotifications["AlreadyMuted"], {"{name}"}, {targetName}))
@@ -399,14 +466,14 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
                 arg:ReplyWith(buildOutput(langString.AdminNotifications["PlayerMuted"], {"{name}"}, {targetName}))
             end
             if srvConsole then
-                printConsole(buildOutput(langString.AdminNotifications["PlayerMuted"], {"{name}"}, {targetName}))
+                printToConsole(buildOutput(langString.AdminNotifications["PlayerMuted"], {"{name}"}, {targetName}))
             end
         else
             if F1Console then
                 arg:ReplyWith(buildOutput(langString.AdminNotifications["PlayerMuted"], {"{name}"}, {targetName}))
             end
             if srvConsole then
-                printConsole(buildOutput(langString.AdminNotifications["PlayerMuted"], {"{name}"}, {targetName}))
+                printToConsole(buildOutput(langString.AdminNotifications["PlayerMuted"], {"{name}"}, {targetName}))
             end
             if chatCmd then
                 rust.SendChatMessage(player, buildOutput(langString.AdminNotifications["PlayerMuted"], {"{name}"}, {targetName}))
@@ -416,17 +483,17 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
         -- Send console log
         if self.Config.Settings.Logging.LogToConsole == "true" then
             if not player then
-                printConsole("[ChatHandler] An admin muted "..targetName)
+                printToConsole("[ChatHandler] An admin muted "..targetName)
             else
-                printConsole("[ChatHandler] "..player.displayName.." muted "..targetName)
+                printToConsole("[ChatHandler] "..player.displayName.." muted "..targetName)
             end
         end
         -- log to file
         if self.Config.Settings.Logging.LogToFile == "true" then
             if not player then
-                printFile("An admin muted "..targetName)
+                printToFile("An admin muted "..targetName)
             else
-                printFile(player.displayName.." muted "..targetName)
+                printToFile(player.displayName.." muted "..targetName)
             end
         end
         return
@@ -439,7 +506,7 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
             arg:ReplyWith(langString.AdminNotifications["InvalidTimeFormat"])
         end
         if srvConsole then
-            printConsole(langString.AdminNotifications["InvalidTimeFormat"])
+            printToConsole(langString.AdminNotifications["InvalidTimeFormat"])
         end
         if chatCmd then
             rust.SendChatMessage(player, langString.AdminNotifications["InvalidTimeFormat"])
@@ -474,7 +541,7 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
             arg:ReplyWith(buildOutput(langString.AdminNotifications["PlayerMutedTimed"], {"{name}", "{time}"}, {targetName, time}))
         end
         if srvConsole then
-            printConsole(buildOutput(langString.AdminNotifications["PlayerMutedTimed"], {"{name}", "{time}"}, {targetName, time}))
+            printToConsole(buildOutput(langString.AdminNotifications["PlayerMutedTimed"], {"{name}", "{time}"}, {targetName, time}))
         end
     else
         rust.SendChatMessage(targetPlayer, buildOutput(langString.PlayerNotifications["MutedTimed"], {"{time}"}, {time}))
@@ -482,7 +549,7 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
             arg:ReplyWith(buildOutput(langString.AdminNotifications["PlayerMutedTimed"], {"{name}", "{time}"}, {targetName, time}))
         end
         if srvConsole then
-            printConsole(buildOutput(langString.AdminNotifications["PlayerMutedTimed"], {"{name}", "{time}"}, {targetName, time}))
+            printToConsole(buildOutput(langString.AdminNotifications["PlayerMutedTimed"], {"{name}", "{time}"}, {targetName, time}))
         end
         if chatCmd then
             rust.SendChatMessage(player, buildOutput(langString.AdminNotifications["PlayerMutedTimed"], {"{name}", "{time}"}, {targetName, time}))
@@ -491,17 +558,17 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
     -- Send console log
     if self.Config.Settings.Logging.LogToConsole == "true" then
         if not player then
-            printConsole("[ChatHandler] An admin muted "..targetName.." for "..muteTime.." "..timeUnitLong)
+            printToConsole("[ChatHandler] An admin muted "..targetName.." for "..muteTime.." "..timeUnitLong)
         else
-            printConsole("[ChatHandler] "..player.displayName.." muted "..targetName.." for "..muteTime.." "..timeUnitLong)
+            printToConsole("[ChatHandler] "..player.displayName.." muted "..targetName.." for "..muteTime.." "..timeUnitLong)
         end
     end
     -- log to file
     if self.Config.Settings.Logging.LogToFile == "true" then
         if not player then
-            printFile("An admin muted "..targetName.." for "..muteTime.." "..timeUnitLong)
+            printToFile("An admin muted "..targetName.." for "..muteTime.." "..timeUnitLong)
         else
-            printFile(player.displayName.." muted "..targetName.." for "..muteTime.." "..timeUnitLong)
+            printToFile(player.displayName.." muted "..targetName.." for "..muteTime.." "..timeUnitLong)
         end
     end
 end
@@ -555,7 +622,7 @@ function PLUGIN:ccmdUnMute(arg)
         if F1Console then
             arg:ReplyWith("Syntax: player.unmute <name/steamID> or player.unmute all to clear mutelist")
         else
-            printConsole("Syntax: player.unmute <name/steamID> or player.unmute all to clear mutelist")
+            printToConsole("Syntax: player.unmute <name/steamID> or player.unmute all to clear mutelist")
         end
         return
     end
@@ -567,7 +634,7 @@ function PLUGIN:ccmdUnMute(arg)
         if F1Console then
             arg:ReplyWith(buildOutput(langString.AdminNotifications["MutelistCleared"], {"{count}"}, {tostring(mutecount)}))
         else
-            printConsole(buildOutput(langString.AdminNotifications["MutelistCleared"], {"{count}"}, {tostring(mutecount)}))
+            printToConsole(buildOutput(langString.AdminNotifications["MutelistCleared"], {"{count}"}, {tostring(mutecount)}))
         end
         return
     end
@@ -576,7 +643,7 @@ function PLUGIN:ccmdUnMute(arg)
         if F1Console then
             arg:ReplyWith(langString.AdminNotifications["PlayerNotFound"])
         else
-            printConsole(langString.AdminNotifications["PlayerNotFound"])
+            printToConsole(langString.AdminNotifications["PlayerNotFound"])
         end
         return
     end
@@ -604,7 +671,7 @@ function PLUGIN:Unmute(player, targetPlayer, arg)
                 arg:ReplyWith(buildOutput(langString.AdminNotifications["PlayerUnmuted"], {"{name}"}, {targetName}))
             end
             if srvConsole then
-                printConsole(buildOutput(langString.AdminNotifications["PlayerUnmuted"], {"{name}"}, {targetName}))
+                printToConsole(buildOutput(langString.AdminNotifications["PlayerUnmuted"], {"{name}"}, {targetName}))
             end
         else
             rust.SendChatMessage(targetPlayer, langString.PlayerNotifications["Unmuted"])
@@ -612,7 +679,7 @@ function PLUGIN:Unmute(player, targetPlayer, arg)
                 arg:ReplyWith(buildOutput(langString.AdminNotifications["PlayerUnmuted"], {"{name}"}, {targetName}))
             end
             if srvConsole then
-                printConsole(buildOutput(langString.AdminNotifications["PlayerUnmuted"], {"{name}"}, {targetName}))
+                printToConsole(buildOutput(langString.AdminNotifications["PlayerUnmuted"], {"{name}"}, {targetName}))
             end
             if chatCmd then
                 rust.SendChatMessage(player, buildOutput(langString.AdminNotifications["PlayerUnmuted"], {"{name}"}, {targetName}))
@@ -621,17 +688,17 @@ function PLUGIN:Unmute(player, targetPlayer, arg)
         -- Send console log
         if self.Config.Settings.Logging.LogToConsole == "true" then
             if player then
-                printConsole("[ChatHandler] "..player.displayName.." unmuted "..targetName)
+                printToConsole("[ChatHandler] "..player.displayName.." unmuted "..targetName)
             else
-                printConsole("[ChatHandler] An admin unmuted "..targetName)
+                printToConsole("[ChatHandler] An admin unmuted "..targetName)
             end
         end
         -- log to file
         if self.Config.Settings.Logging.LogToFile == "true" then
             if player then
-                printFile(player.displayName.." unmuted "..targetName)
+                printToFile(player.displayName.." unmuted "..targetName)
             else
-                printFile("An admin unmuted "..targetName)
+                printToFile("An admin unmuted "..targetName)
             end
         end
         return
@@ -641,7 +708,7 @@ function PLUGIN:Unmute(player, targetPlayer, arg)
         arg:ReplyWith(buildOutput(langString.AdminNotifications["PlayerNotMuted"], {"{name}"}, {targetName}))
     end
     if srvConsole then
-        printConsole(buildOutput(langString.AdminNotifications["PlayerNotMuted"], {"{name}"}, {targetName}))
+        printToConsole(buildOutput(langString.AdminNotifications["PlayerNotMuted"], {"{name}"}, {targetName}))
     end
     if chatCmd then
         rust.SendChatMessage(player, buildOutput(langString.AdminNotifications["PlayerNotMuted"], {"{name}"}, {targetName}))
@@ -665,12 +732,12 @@ function PLUGIN:OnPlayerChat(arg)
                 rust.BroadcastChat(buildOutput(langString.PlayerNotifications["BroadcastAutoMutes"], {"{name}", "{punishTime}"}, {player.displayName, punishTime}))
             end
             if self.Config.Settings.Logging.LogToConsole == "true" then
-                printConsole("[ChatHandler] "..player.displayName.." got a "..punishTime.." auto mute for spam")
+                printToConsole("[ChatHandler] "..player.displayName.." got a "..punishTime.." auto mute for spam")
             end
             if self.Config.Settings.Logging.LogToFile == "true" then
-                printFile(player.displayName.." got a "..punishTime.." auto mute for spam")
+                printToFile(player.displayName.." got a "..punishTime.." auto mute for spam")
             end
-            return true
+            return false
         end
     end
     -- Parse message to filter stuff and check if message should be blocked
@@ -686,12 +753,18 @@ function PLUGIN:OnPlayerChat(arg)
             end
         end
         rust.SendChatMessage(player, errorMsg)
-        return true
+        return false
     end
     -- Chat is ok and not blocked
-    local username, message = self:BuildNameMessage(player, msg)
-    self:SendChat(player, username, message)
-    return true
+    local maxCharsPerLine = tonumber(self.Config.Settings.General.MaxCharsPerLine)
+    msg = splitLongMessages(msg, maxCharsPerLine) -- msg is a table now
+    local i = 1
+    while msg[i] do
+        local username, message, logUsername, logMessage = self:BuildNameMessage(player, msg[i])
+        self:SendChat(player, username, message, logUsername, logMessage)
+        i = i + 1
+    end
+    return false
 end
 -- --------------------------------
 -- checks for chat spam
@@ -848,29 +921,69 @@ end
 -- returns (string)username, (string)message
 -- --------------------------------
 function PLUGIN:BuildNameMessage(player, msg)
-    local username = player.displayName
-    local message = msg
+    local username, logUsername = player.displayName, player.displayName
+    local message, logMessage = msg, msg
     local steamID = rust.UserIDFromPlayer(player)
+    local foundPerm = false
     if AdminMode[steamID] then
         if self.Config.Settings.AdminMode.ReplaceChatName == "true" then
-            username = self.Config.Settings.AdminMode.AdminChatName
+            username = "<color="..self.Config.Settings.NameColor.AdminMode..">"..self.Config.Settings.AdminMode.AdminChatName.."</color>"
+            message = "<color="..self.Config.Settings.NameColor.AdminMode..">"..message.."</color>"
+            logUsername = self.Config.Settings.AdminMode.AdminChatName
+            logMessage = msg
+            return username, message, logUsername, logMessage
+        else
+            username = "<color="..self.Config.Settings.NameColor.AdminMode..">"..username.."</color>"
+            message = "<color="..self.Config.Settings.NameColor.AdminMode..">"..message.."</color>"
+            logUsername = self.Config.Settings.AdminMode.AdminChatName
+            logMessage = msg
+            return username, message, logUsername, logMessage
         end
     end
-    return username, message
+    if self.Config.Settings.Groups.EnableGroups == "true" then
+        for key, value in pairs(self.Config.ChatGroups) do
+            if permission.UserHasPermission(steamID, self.Config.ChatGroups[key].Permission) then
+                if self.Config.ChatGroups[key].ShowPrefix == true then
+                    if self.Config.Settings.Groups.PrefixPosition == "left" then
+                        username = self.Config.ChatGroups[key].Prefix.." "..username
+                        logUsername = self.Config.ChatGroups[key].Prefix.." "..logUsername
+                    else
+                        username = username.." "..self.Config.ChatGroups[key].Prefix
+                        logUsername = logUsername.." "..self.Config.ChatGroups[key].Prefix
+                    end
+                end
+                if self.Config.ChatGroups[key].ShowColor then
+                    if self.Config.Settings.Groups.ColorNamesOnly == "true" then
+                        username = "<color="..self.Config.ChatGroups[key].Color..">"..username.."</color>"
+                    else
+                        username = "<color="..self.Config.ChatGroups[key].Color..">"..username.."</color>"
+                        message = "<color="..self.Config.ChatGroups[key].Color..">"..message.."</color>"
+                    end
+                else
+                    username = "<color="..self.Config.Settings.NameColor.NormalUser..">"..username.."</color>"
+                end
+                foundPerm = true
+            end
+        end
+    end
+    if not foundPerm then
+        username = "<color="..self.Config.Settings.NameColor.NormalUser..">"..username.."</color>"
+    end
+    return username, message, logUsername, logMessage
 end
 -- --------------------------------
 -- sends and logs chat messages
 -- --------------------------------
-function PLUGIN:SendChat(player, name, msg)
+function PLUGIN:SendChat(player, name, msg, logName, logMsg)
     local steamID = rust.UserIDFromPlayer(player)
     -- Broadcast chat ingame
     self:BroadcastChat(player, name, msg)
     -- Log chat to console
-    global.ServerConsole.PrintColoured(System.ConsoleColor.DarkYellow, name..": ", System.ConsoleColor.DarkGreen, msg)
+    global.ServerConsole.PrintColoured(System.ConsoleColor.DarkYellow, logName..": ", System.ConsoleColor.DarkGreen, logMsg)
     -- Log chat to Rusty chat stream
-    UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({"[CHAT] "..name..": "..msg}))
+    UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({"[CHAT] "..logName..": "..logMsg}))
     -- Log chat to log file
-    global.server.Log("Log.Chat.txt", steamID.."/"..name..": "..msg.."\n")
+    global.server.Log("Log.Chat.txt", steamID.."/"..logName..": "..logMsg.."\n")
     -- Log chat history
     if self.Config.Settings.General.EnableChatHistory == "true" then
         self:InsertHistory(name, steamID, msg)
