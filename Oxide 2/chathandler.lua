@@ -1,8 +1,7 @@
 PLUGIN.Title        = "Chat Handler"
 PLUGIN.Description  = "Many features to help moderate the chat"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(2, 5, 0)
-PLUGIN.HasConfig    = true
+PLUGIN.Version      = V(2, 5, 3)
 PLUGIN.ResourceID   = 707
 
 local debugMode = false
@@ -18,6 +17,8 @@ local LogFile = "Log.ChatHandler.txt"
 local AntiSpam, ChatHistory, AdminMode = {}, {}, {}
 local GlobalMute = false
 local langString
+-- external plugin references
+local exRanksAndTitles
 -- --------------------------------
 -- initialise all settings and data
 -- --------------------------------
@@ -27,6 +28,9 @@ function PLUGIN:Init()
     self:LoadDataFiles()
     self:LoadLocalization()
     self:RegisterPermissions()
+end
+function PLUGIN:OnServerInitialized()
+    exRanksAndTitles = plugins.Find("RanksAndTitles") or false
 end
 -- --------------------------------
 -- error and debug reporting
@@ -968,6 +972,26 @@ function PLUGIN:BuildNameMessage(player, msg)
     end
     if not foundPerm then
         username = "<color="..self.Config.Settings.NameColor.NormalUser..">"..username.."</color>"
+    end
+    -- Add title if plugin RanksAndTitles is installed
+    if exRanksAndTitles then
+        local title = exRanksAndTitles:Call("grabPlayerData", steamID, "Title")
+        local hideTitle = exRanksAndTitles:Call("grabPlayerData", steamID, "hidden")
+        local colorOn = exRanksAndTitles.Config.Settings.colorSupport
+        local color = exRanksAndTitles:Call("getColor", steamID)
+        if not hideTitle and title ~= "" and colorOn then
+            username = username.."<color="..color.."> ["..title.."]</color>"
+            logUsername = logUsername.." ["..title.."]"
+        end
+        if not hideTitle and title ~= "" and not colorOn then
+            if string.sub(username, -8) == "</color>" then
+                username = string.sub(username, 1, -9).." ["..title.."]</color>"
+                logUsername = logUsername.." ["..title.."]"
+            else
+                username = username.." ["..title.."]"
+                logUsername = logUsername.." ["..title.."]"
+            end
+        end
     end
     return username, message, logUsername, logMessage
 end
