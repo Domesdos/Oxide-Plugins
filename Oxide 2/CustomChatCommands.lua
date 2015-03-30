@@ -1,70 +1,118 @@
-PLUGIN.Title = "Custom Chat Commands"
-PLUGIN.Description = "Set completely custom chat commands"
-PLUGIN.Author = "#Domestos"
-PLUGIN.Version = V(2, 2, 0)
-PLUGIN.HasConfig = true
-PLUGIN.ResourceID = 649
+PLUGIN.Title        = "Custom Chat Commands"
+PLUGIN.Description  = "Set completely custom chat commands"
+PLUGIN.Author       = "#Domestos"
+PLUGIN.Version      = V(2, 3, 1)
+PLUGIN.ResourceID   = 649
 
+-- --------------------------------
+-- init
+-- --------------------------------
 function PLUGIN:Init()
-    for key, value in pairs(self.Config.ChatCommands) do
-        command.AddChatCommand(key, self.Object, "cmdChatCmd")
+    for cmd, _ in pairs(self.Config.ChatCommands) do
+        command.AddChatCommand(cmd, self.Object, "cmdChatCmd")
     end
     self:LoadDefaultConfig()
+    self:RegisterPermissions()
 end
-
-local function IsAdmin(player)
-    return player:GetComponent("BaseNetworkable").net.connection.authLevel > 0
+-- --------------------------------
+-- permission check
+-- --------------------------------
+local function HasPermission(player, perm)
+    local steamID = rust.UserIDFromPlayer(player)
+    if player:GetComponent("BaseNetworkable").net.connection.authLevel > 0 then
+        return true
+    end
+    if permission.UserHasPermission(steamID, perm) then
+        return true
+    end
+    return false
 end
-
+-- --------------------------------
+-- load config
+-- --------------------------------
 function PLUGIN:LoadDefaultConfig()
-    self.Config.Settings = self.Config.Settings or {}
-    self.Config.Settings.ChatName = self.Config.Settings.ChatName or "SERVER"
-    self.Config.ChatCommands = self.Config.ChatCommands or {
+    -- general settings
+    self.Config.Settings                = self.Config.Settings or {}
+    self.Config.Settings.ChatName       = self.Config.Settings.ChatName or "SERVER"
+    -- messages
+    self.Config.Messages                = self.Config.Messages or {}
+    self.Config.Messages.NoPermission   = self.Config.Messages.NoPermission or "You dont have permission to use this command!"
+    -- chat commands
+    self.Config.ChatCommands            = self.Config.ChatCommands or {
         ["command1"] = {
             ["text"] = {"This is an example text"},
             ["helptext"] = "This is the helptext for this command",
-            ["admin"] = false
+            ["permission"] = false
         },
         ["command2"] = {
             ["text"] = {"This is an example text for admins only", "You can also use multiline messages"},
             ["helptext"] = "This is the helptext for this command, also admin only",
-            ["admin"] = true
+            ["permission"] = "admin"
         }
     }
+    -- update old admin entries to new permission entries added in v2.3.0
+    for key, _ in pairs(self.Config.ChatCommands) do
+        if self.Config.ChatCommands[key].admin then
+            self.Config.ChatCommands[key].admin = nil
+            self.Config.ChatCommands[key].permission = "admin"
+        elseif self.Config.ChatCommands[key].admin ~= nil then
+            self.Config.ChatCommands[key].admin = nil
+            self.Config.ChatCommands[key].permission = false
+        end
+    end
     self:SaveConfig()
 end
-
-function PLUGIN:cmdChatCmd(player, cmd, args)
-    for key, value in pairs(self.Config.ChatCommands) do
-        if cmd == key then
-            -- Check if command is admin only
-            if self.Config.ChatCommands[key].admin then
-                -- Check if user has permission to use command
-                if IsAdmin(player) then
-                    -- Output the text
-                    for k, v in pairs(self.Config.ChatCommands[key].text) do
-                        rust.SendChatMessage(player, self.Config.Settings.ChatName, self.Config.ChatCommands[key].text[k])
+-- --------------------------------
+-- register permissions
+-- --------------------------------
+function PLUGIN:RegisterPermissions()
+    for key, _ in pairs(self.Config.ChatCommands) do
+        local perm = self.Config.ChatCommands[key].permission or false
+        if perm then
+            if not permission.PermissionExists(perm) then
+                permission.RegisterPermission(perm, self.Object)
+            end
+        end
+    end
+end
+-- --------------------------------
+-- handles the chat commands
+-- --------------------------------
+function PLUGIN:cmdChatCmd(player, chatcmd)
+    local chatName = self.Config.Settings.ChatName
+    for key, _ in pairs(self.Config.ChatCommands) do
+        if chatcmd == key then
+            local cmd = self.Config.ChatCommands[key]
+            if cmd.permission then
+                if HasPermission(player, cmd.permission) then
+                    for k, _ in pairs(cmd.text) do
+                        rust.SendChatMessage(player, chatName, cmd.text[k])
                     end
+                else
+                    rust.SendChatMessage(player, chatName, self.Config.Messages.NoPermission)
                 end
             else
-                -- Command can be used by everyone
-                for k, v in pairs(self.Config.ChatCommands[key].text) do
-                    rust.SendChatMessage(player, self.Config.Settings.ChatName, self.Config.ChatCommands[key].text[k])
+                for k, _ in pairs(cmd.text) do
+                    rust.SendChatMessage(player, chatName, cmd.text[k])
                 end
             end
         end
     end
 end
-
+-- --------------------------------
+-- send helptext
+-- --------------------------------
 function PLUGIN:SendHelpText(player)
-    for key, value in pairs(self.Config.ChatCommands) do
-        if self.Config.ChatCommands[key].helptext and self.Config.ChatCommands[key] ~= "" then
-            if self.Config.ChatCommands[key].admin then
-                if IsAdmin(player) then
-                    rust.SendChatMessage(player, self.Config.Settings.ChatName, self.Config.ChatCommands[key].helptext)
+    local chatName = self.Config.Settings.ChatName
+    for key, _ in pairs(self.Config.ChatCommands) do
+        local cmd = self.Config.ChatCommands[key]
+        if cmd.helptext and cmd ~= "" then
+            if cmd.permission then
+                if HasPermission(player, cmd.permission) then
+                    rust.SendChatMessage(player, chatName, cmd.helptext)
                 end
             else
-                rust.SendChatMessage(player, self.Config.Settings.ChatName, self.Config.ChatCommands[key].helptext)
+                rust.SendChatMessage(player, chatName, cmd.helptext)
             end
         end
     end
