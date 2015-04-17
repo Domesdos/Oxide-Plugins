@@ -1,8 +1,8 @@
 PLUGIN.Title        = "Helptext"
 PLUGIN.Description  = "Hooks into plugins to send helptext"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(1, 0, 0)
-PLUGIN.ResourceID   = _
+PLUGIN.Version      = V(1, 0, 2)
+PLUGIN.ResourceId   = 962
 
 function PLUGIN:Init()
     command.AddChatCommand("help", self.Object, "cmdHelp")
@@ -21,7 +21,7 @@ function PLUGIN:LoadDefaultConfig()
 end
 
 function PLUGIN:cmdHelp(netuser)
-    if not player then return end
+    if not netuser then return end
     if self.Config.Settings.UseCustomHelpText == "true" then
         for _, helptext in pairs(self.Config.CustomHelpText) do
             rust.SendChatMessage(netuser, helptext)
