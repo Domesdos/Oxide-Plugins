@@ -50,10 +50,17 @@ local function debug(msg)
     UnityEngine.Debug.LogWarning.methodarray[0]:Invoke(nil, array)
 end
 -- --------------------------------
--- admin permission check
+-- permission check
 -- --------------------------------
-local function IsAdmin(player)
-    return player:GetComponent("BaseNetworkable").net.connection.authLevel > 0
+local function HasPermission(player, perm)
+    local steamID = rust.UserIDFromPlayer(player)
+    if player:GetComponent("BaseNetworkable").net.connection.authLevel == 2 then
+        return true
+    end
+    if permission.UserHasPermission(steamID, perm) then
+        return true
+    end
+    return false
 end
 -- --------------------------------
 -- builds output messages by replacing wildcards
@@ -127,7 +134,14 @@ function PLUGIN:LoadDefaultConfig()
     self.Config.Settings.ChatCommands.Mute              = self.Config.Settings.ChatCommands.Mute or {"mute"}
     self.Config.Settings.ChatCommands.Unmute            = self.Config.Settings.ChatCommands.Unmute or {"unmute"}
     self.Config.Settings.ChatCommands.GlobalMute        = self.Config.Settings.ChatCommands.GlobalMute or {"globalmute"}
-    self.Config.Settings.ChatCommands.Wordfilter        = self.Config.Settings.ChatCommands.Wordfilter or {"wordfilter"}
+    self.Config.Settings.ChatCommands.Wordfilter        = self.Config.Settings.ChatCommands.Wordfilter or {"wordfilter" }
+    -- command permissions
+    self.Config.Settings.Permissions                    = self.Config.Settings.Permissions or {}
+    self.Config.Settings.Permissions.AdminMode          = self.Config.Settings.Permissions.AdminMode or "canadminmode"
+    self.Config.Settings.Permissions.Mute               = self.Config.Settings.Permissions.Mute or "canmute"
+    self.Config.Settings.Permissions.GlobalMute         = self.Config.Settings.Permissions.GlobalMute or "canglobalmute"
+    self.Config.Settings.Permissions.AntiGlobalMute     = self.Config.Settings.Permissions.AntiGlobalMute or "notglobalmuted"
+    self.Config.Settings.Permissions.EditWordFilter     = self.Config.Settings.Permissions.EditWordFilter or "caneditwordfilter"
     -- Name colors
     self.Config.Settings.NameColor                      = self.Config.Settings.NameColor or {}
     self.Config.Settings.NameColor.NormalUser           = self.Config.Settings.NameColor.NormalUser or "#5af"
@@ -268,6 +282,13 @@ end
 -- register all permissions for group system
 -- --------------------------------
 function PLUGIN:RegisterPermissions()
+    -- command permissions
+    for _, perm in pairs(self.Config.Settings.Permissions) do
+        if not permission.PermissionExists(perm) then
+            permission.RegisterPermission(perm, self.Object)
+        end
+    end
+    -- group permissions
     if self.Config.Settings.Groups.EnableGroups == "true" then
         for key, _ in pairs(self.Config.ChatGroups) do
             permission.RegisterPermission(self.Config.ChatGroups[key].Permission, self.Object)
@@ -347,7 +368,7 @@ end
 -- handles chat command /admin
 -- --------------------------------
 function PLUGIN:cmdAdminMode(player)
-    if not IsAdmin(player) then
+    if not HasPermission(player, self.Config.Settings.Permissions.AdminMode) then
         rust.SendChatMessage(player, langString.AdminNotifications["NoPermission"])
         return
     end
@@ -364,7 +385,7 @@ end
 -- handles chat command /globalmute
 -- --------------------------------
 function PLUGIN:cmdGlobalMute(player)
-    if not IsAdmin(player) then
+    if not HasPermission(player, self.Config.Settings.Permissions.GlobalMute) then
         rust.SendChatMessage(player, langString.AdminNotifications["NoPermission"])
         return
     end
@@ -380,7 +401,7 @@ end
 -- handles chat command /mute
 -- --------------------------------
 function PLUGIN:cmdMute(player, cmd, args)
-    if not IsAdmin(player) then
+    if not HasPermission(player, self.Config.Settings.Permissions.Mute) then
         rust.SendChatMessage(player, langString.AdminNotifications["NoPermission"])
         return
     end
@@ -406,7 +427,7 @@ function PLUGIN:ccmdMute(arg)
         player = arg.connection.player
     end
     if player then F1Console = true end
-    if player and not IsAdmin(player) then
+    if player and not HasPermission(player, self.Config.Settings.Permissions.Mute) then
         arg:ReplyWith(langString.AdminNotifications["NoPermission"])
         return true
     end
@@ -580,7 +601,7 @@ end
 -- handles chat command /unmute
 -- --------------------------------
 function PLUGIN:cmdUnMute(player, cmd, args)
-    if not IsAdmin(player) then
+    if not HasPermission(player, self.Config.Settings.Permissions.Mute) then
         rust.SendChatMessage(player, langString.AdminNotifications["NoPermission"])
         return
     end
@@ -616,7 +637,7 @@ function PLUGIN:ccmdUnMute(arg)
         player = arg.connection.player
     end
     if player then F1Console = true end
-    if player and not IsAdmin(player) then
+    if player and not HasPermission(player, self.Config.Settings.Permissions.Mute) then
         arg:ReplyWith(langString.AdminNotifications["NoPermission"])
         return true
     end
@@ -851,7 +872,7 @@ function PLUGIN:ParseChat(player, msg)
         end
     end
     -- Check global mute
-    if GlobalMute and not IsAdmin(player) then
+    if GlobalMute and not HasPermission(player, self.Config.Settings.Permissions.AntiGlobalMute) then
         return false, msg, langString.PlayerNotifications["GlobalMuted"], "[MUTED]"
     end
     -- Check for server advertisements
@@ -1053,14 +1074,14 @@ function PLUGIN:cmdEditWordFilter(player, cmd, args)
     local args = self:ArgsToTable(args, "chat")
     local func, word, replacement = args[1], args[2], args[3]
     if not func or func ~= "add" and func ~= "remove" and func ~= "list" then
-        if not IsAdmin(player) then
+        if not HasPermission(player, self.Config.Settings.Permissions.EditWordFilter) then
             rust.SendChatMessage(player, "Syntax /wordfilter list")
         else
             rust.SendChatMessage(player, "Syntax: /wordfilter add <word> <replacement> or /wordfilter remove <word>")
         end
         return
     end
-    if func ~= "list" and not IsAdmin(player) then
+    if func ~= "list" and not HasPermission(player, self.Config.Settings.Permissions.EditWordFilter) then
         rust.SendChatMessage(player, langString.AdminNotifications["NoPermission"])
         return
     end
