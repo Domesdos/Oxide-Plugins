@@ -1,0 +1,214 @@
+{
+  "Localization": {
+    "en": {
+      "HelpText": {
+        "Wordfilter": "Use /wordfilter list to see blacklisted words",
+        "ChatHistory": "Use /history or /h to view recent chat history"
+      },
+      "AdminNotifications": {
+        "PlayerMutedTimed": "{name} has been muted for {time}",
+        "AlreadyMuted": "{name} is already muted",
+        "NoPermission": "You dont have permission to use this command",
+        "AdminModeEnabled": "Admin mode is now enabled for you",
+        "AdminModeDisabled": "Admin mode is now disabled for you",
+        "WordfilterNotFound": "No filter for {word} found to remove",
+        "PlayerMuted": "{name} has been muted",
+        "MutelistCleared": "Cleared {count} entries from mutelist",
+        "PlayerNotFound": "Player not found",
+        "PlayerUnmuted": "{name} has been unmuted",
+        "PlayerNotMuted": "{name} is not muted",
+        "WordfilterError": "Error: {replacement} contains the word {word}",
+        "InvalidTimeFormat": "invalid time format",
+        "WordfilterAdded": "WordFilter added. {word} will now be replaced with {replacement}",
+        "WordfilterRemoved": "successfully removed {word} from the wordfilter"
+      },
+      "PlayerNotifications": {
+        "MutedTimed": "You have been muted for {time}",
+        "NoChatHistory": "No chat history found",
+        "WordfilterList": "Blacklisted words: {wordFilterList}",
+        "Unmuted": "You have been unmuted",
+        "BroadcastAutoMutes": "{name} got {punishTime} auto muted for spam",
+        "IsTimeMuted": "You are muted for {timeMuted}",
+        "IsMuted": "You are muted",
+        "BroadcastMutes": "{name} has been muted",
+        "AdWarning": "Its not allowed to advertise other servers",
+        "BroadcastMutesTimed": "{name} has been muted for {time}",
+        "Muted": "You have been muted",
+        "GlobalMuted": "Chat is currently global muted",
+        "BroadcastUnmutes": "{name} has been unmuted",
+        "GlobalMuteEnabled": "An admin activated the gloabl chat mute",
+        "GlobalMuteDisabled": "Global chat mute is now deactivated",
+        "SpamWarning": "If you keep spamming your punishment will raise",
+        "AutoMuted": "You got {punishTime} auto muted for spam"
+      }
+    },
+    "ru": {
+      "HelpText": {
+        "Wordfilter": "/wordfilter - список запрещенных слов",
+        "ChatHistory": "/history или /h - просмотр истории чата"
+      },
+      "AdminNotifications": {
+        "PlayerMutedTimed": "{name} был приглушен на {time}",
+        "AlreadyMuted": "{name} уже приглушен",
+        "NoPermission": "У вас нет прав для использования этой команды",
+        "AdminModeEnabled": "Для вас активирован режим админа",
+        "AdminModeDisabled": "Для вас дезактивирован режим админа",
+        "WordfilterNotFound": "Фильтров для {word} не было найдено",
+        "PlayerMuted": "{name} был приглушен",
+        "MutelistCleared": "Очищено {count} записей из списка приглушенных",
+        "PlayerNotFound": "Игрок не найден",
+        "PlayerUnmuted": "Для {name} был разблокирован чат",
+        "PlayerNotMuted": "{name} не приглушен",
+        "WordfilterError": "Ошибка: {replacement} содержит слово {word}",
+        "InvalidTimeFormat": "неверный формат времени",
+        "WordfilterAdded": "WordFilter добавлен. {word} будет заменено на {replacement}",
+        "WordfilterRemoved": "{word} удачно удалено из WordFilter"
+      },
+      "PlayerNotifications": {
+        "MutedTimed": "Вы были приглушены на {time}",
+        "NoChatHistory": "Не найдено истории чата",
+        "WordfilterList": "Список запрещенных слов: {wordFilterList}",
+        "Unmuted": "Вам был разблокирован чат",
+        "BroadcastAutoMutes": "{name} получил {punishTime} автоблокировки чата за спам",
+        "IsTimeMuted": "Вы приглушены на {timeMuted}",
+        "IsMuted": "Вы были приглушены",
+        "BroadcastMutes": "{name} был приглушен",
+        "AdWarning": "Запрещено рекламировать сторонние сервера",
+        "BroadcastMutesTimed": "{name} был приглушен на {time}",
+        "Muted": "Вы были приглушены",
+        "GlobalMuted": "Глобальный чат в настоящее время отключен",
+        "BroadcastUnmutes": "Для {name} был разблокирован чат",
+        "GlobalMuteEnabled": "Администратор заблокировал глобальный чат",
+        "GlobalMuteDisabled": "Блокировка глобального чата отключена",
+        "SpamWarning": "Если продолжите спамить, то наказание возрастет",
+        "AutoMuted": "Вы получили {punishTime} автоблокировки чата за спам"
+      }
+    },
+    "fr": {
+      "HelpText": {
+        "Wordfilter": "Tapez /wordfilter pour afficher la liste des mots interdits.",
+        "ChatHistory": "Tapez /history ou /h pour afficher l'historique du tchat."
+      },
+      "AdminNotifications": {
+        "PlayerMutedTimed": "{name} a été muté pour {time}",
+        "AlreadyMuted": "{name} est déjà muté",
+        "NoPermission": "Vous n'avez pas la permission d'utiliser cette commande",
+        "AdminModeEnabled": "Mode admin activé",
+        "AdminModeDisabled": "Mode admin désactivé",
+        "WordfilterNotFound": "Le mot '{word}' n'est actuellement pas dans la liste des mots interdits",
+        "PlayerMuted": "{name} a été muté.",
+        "MutelistCleared": "Nettoyage de {count} entrées dans la liste des mots interdits",
+        "PlayerNotFound": "Joueur introuvable",
+        "PlayerUnmuted": "{name} a été démuté",
+        "PlayerNotMuted": "{name} n'est actuellement pas muté",
+        "WordfilterError": "Erreur : {replacement} contient le mot : {word}",
+        "InvalidTimeFormat": "Le format de temps est invalide",
+        "WordfilterAdded": "{word} a bien été ajouté à la liste des mots interdits et sera remplacé par : {replacement}",
+        "WordfilterRemoved": "{word} a été retiré de la liste des mots interdits"
+      },
+      "PlayerNotifications": {
+        "MutedTimed": "Vous êtes actuellement muté pour {time}",
+        "NoChatHistory": "Aucun historique disponible",
+        "WordfilterList": "Mots interdits : {wordFilterList}",
+        "Unmuted": "Vous n'êtes plus muté",
+        "BroadcastAutoMutes": "{name} a automatiquement été muté {punishTime} pour spam",
+        "IsTimeMuted": "Vous êtes muté pour {timeMuted}",
+        "IsMuted": "Vous êtes muté",
+        "BroadcastMutes": "{name} a été muté",
+        "AdWarning": "La pub pour d'autres serveurs est interdite !",
+        "BroadcastMutesTimed": "{name} est maintenant muté pour {time}",
+        "Muted": "Vous ne pouvez plus parler car un admin vous a muté",
+        "GlobalMuted": "Le tchat est actuellement désactivé",
+        "BroadcastUnmutes": "{name} n'est maintenant plus muté",
+        "GlobalMuteEnabled": "Un admin a momentanément désactivé le tchat",
+        "GlobalMuteDisabled": "Le tchat est maintenant réactivé",
+        "SpamWarning": "Attention : Si vous continué de spam ainsi, vous allez être muté !",
+        "AutoMuted": "Vous avez été automatiquement muté {punishTime} pour spam"
+      }
+    },
+    "pt-br": {
+      "HelpText": {
+        "Wordfilter": "Use /wordfilter list para ver a lista de palavras que estão na lista negra",
+        "ChatHistory": "Use /history ou /h para ver o histórico do chat"
+      },
+      "AdminNotifications": {
+        "PlayerMutedTimed": "{name} acabou de ser mutado por {time}",
+        "AlreadyMuted": "{name} já está mutado",
+        "NoPermission": "Você não tem permissão para utilizar este comando",
+        "AdminModeEnabled": "Modo admin agora está habilitado para você",
+        "AdminModeDisabled": "Modo admin agora está desabilitado para você",
+        "WordfilterNotFound": "Nenhum filtro para a palavra {word} foi encontrado para ser removido",
+        "PlayerMuted": "{name} acabou de ser mutado",
+        "MutelistCleared": "Limpadas {count} entradas da lista de mute",
+        "PlayerNotFound": "Player não foi encontrado",
+        "PlayerUnmuted": "{name} acabou de ser desmutado",
+        "PlayerNotMuted": "{name} não está mutado",
+        "WordfilterError": "Error: {replacement} contém a palavra {word}",
+        "InvalidTimeFormat": "formato inválido de tempo",
+        "WordfilterAdded": "WordFilter added. {word} will now be replaced with {replacement}",
+        "WordfilterRemoved": "Palavra {word} foi removida com sucesso do filtro de palavras"
+      },
+      "PlayerNotifications": {
+        "MutedTimed": "Você acabou de ser mutado por {time}",
+        "NoChatHistory": "Nenhum histórico do chat foi encontrado",
+        "WordfilterList": "Palavras proibidas: {wordFilterList}",
+        "Unmuted": "Você acabou de ser desmutado",
+        "BroadcastAutoMutes": "{name} foi {punishTime} auto mutado por spam",
+        "IsTimeMuted": "Você está mutado por {timeMuted}",
+        "IsMuted": "Você está mutado",
+        "BroadcastMutes": "{name} acabou de ser mutado",
+        "AdWarning": "Não é permitido fazer propaganda de outros servidores!",
+        "BroadcastMutesTimed": "{name} acabou de ser mutado por {time}",
+        "Muted": "Você acabou de ser mutado",
+        "GlobalMuted": "O chat global está atualmente mutado!",
+        "BroadcastUnmutes": "{name} acabou de ser desmutado",
+        "GlobalMuteEnabled": "Um admin acabou de mutar o chat Global!",
+        "GlobalMuteDisabled": "O mute do chat global acabou de ser desativado",
+        "SpamWarning": "Se você continuar com o spam, a sua punição irá apenas aumentar",
+        "AutoMuted": "Você foi {punishTime} auto mutado por spam"
+      }
+    },
+    "de": {
+      "HelpText": {
+        "Wordfilter": "Benutze /wordfilter list um eine Liste unerlaubter Wörter zu sehen",
+        "ChatHistory": "Benutze /history oder /h um die Chat History anzuzeigen"
+      },
+      "AdminNotifications": {
+        "PlayerMutedTimed": "{name} wurde für {time} gemutet",
+        "AlreadyMuted": "{name} ist bereits gemutet",
+        "NoPermission": "Du hast keine Berechtigung für diesen Befehl",
+        "AdminModeEnabled": "Admin Modus ist jetzt aktiviert für dich",
+        "AdminModeDisabled": "Admin Modus ist jetzt deaktiviert für dich",
+        "WordfilterNotFound": "Kein Filter für {word} zum Entfernen gefunden",
+        "PlayerMuted": "{name} wurde gemutet",
+        "MutelistCleared": "{count} Einträge aus der Muteliste gelöscht",
+        "PlayerNotFound": "Spieler nicht gefunden",
+        "PlayerUnmuted": "{name} wurde entmutet",
+        "PlayerNotMuted": "{name} ist nicht gemutet",
+        "WordfilterError": "Error: {replacement} enthällt das Wort {word}",
+        "InvalidTimeFormat": "Ungültiges Zeitformat",
+        "WordfilterAdded": "Wortfilter hinzugefügt. {word} wird nun durch {replacement} ersetzt",
+        "WordfilterRemoved": "{word} erfolgreich aus dem Wortfilter entfernt"
+      },
+      "PlayerNotifications": {
+        "MutedTimed": "Du wurdest für {time} gemutet",
+        "NoChatHistory": "Keine Chat History gefunden",
+        "WordfilterList": "Unerlaubte Wörter: {wordFilterList}",
+        "Unmuted": "Du wurdest entmutet",
+        "BroadcastAutoMutes": "{name} wurde wegen Spam für {punishTime} automatisch gemutet",
+        "IsTimeMuted": "Du bist für {timeMuted} gemutet",
+        "IsMuted": "Du bist gemutet",
+        "BroadcastMutes": "{name} wurde gemutet",
+        "AdWarning": "Es ist nicht erlaubt Werbung für andere Server zu machen",
+        "BroadcastMutesTimed": "{name} wurde für {time} gemutet",
+        "Muted": "Du wurdest gemutet",
+        "GlobalMuted": "Der Chat ist momentan global gemutet",
+        "BroadcastUnmutes": "{name} wurde entmutet",
+        "GlobalMuteEnabled": "Chat wurde von einem Admin global gemutet",
+        "GlobalMuteDisabled": "Der globale Chat mute wurde aufgehoben",
+        "SpamWarning": "Spamst du weiter wird die Bestrafung automatisch verlängert",
+        "AutoMuted": "Du wurdest automatisch wegen Spam für {punishTime} gemutet"
+      }
+    }
+  }
+}
