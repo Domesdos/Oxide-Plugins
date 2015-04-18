@@ -12,6 +12,15 @@ function PLUGIN:Init()
 end
 
 -- --------------------------------
+-- temporary until rust.SendChatMessage() supports chat names
+-- --------------------------------
+function PLUGIN:SendChatMessage(netuser, ToOrFrom, chatName, message)
+    local color = "#ff00ff"
+    local chatName = "PM "..ToOrFrom.." "..chatName
+    local message = "[Color "..color.."]"..message
+    global.ConsoleNetworker.SendClientCommand(netuser.networkPlayer, "chat.add "..rust.QuoteSafe(chatName).." "..rust.QuoteSafe(message).."")
+end
+-- --------------------------------
 -- Chat command for pm
 -- --------------------------------
 function PLUGIN:cmdPm(netuser, _, args)
@@ -36,10 +45,8 @@ function PLUGIN:cmdPm(netuser, _, args)
     local senderSteamID = rust.UserIDFromPlayer(netuser)
     local targetName = targetNetuser.displayName
     local targetSteamID = rust.UserIDFromPlayer(targetNetuser)
-    --rust.SendChatMessage(targetNetuser, "<color=#ff00ff>PM from "..senderName.."</color>", message, senderSteamID)
-    global.ConsoleNetworker.SendClientCommand(targetNetuser.networkPlayer, "chat.add [Color #ff00ff]PM from "..senderName.." "..rust.QuoteSafe(message).."")
-    --rust.SendChatMessage(netuser, "<color=#ff00ff>PM to "..targetName.."</color>", message, senderSteamID)
-    global.ConsoleNetworker.SendClientCommand(netuser.networkPlayer, "chat.add [Color #ff00ff]PM to "..targetName.." "..rust.QuoteSafe(message).."")
+    self:SendChatMessage(targetNetuser, "from", senderName, message)
+    self:SendChatMessage(netuser, "to", targetName, message)
     pmHistory[targetSteamID] = senderSteamID
 end
 -- --------------------------------
@@ -67,10 +74,8 @@ function PLUGIN:cmdReply(netuser, _, args)
             return
         end
         local targetName = targetNetuser.displayName
-        --rust.SendChatMessage(targetNetuser, "<color=#ff00ff>PM from "..senderName.."</color>", message, senderSteamID)
-        global.ConsoleNetworker.SendClientCommand(targetNetuser.networkPlayer, "chat.add [Color #ff00ff]PM from "..senderName.." "..rust.QuoteSafe(message).."")
-        --rust.SendChatMessage(netuser, "<color=#ff00ff>PM to "..targetName.."</color>", message, senderSteamID)
-        global.ConsoleNetworker.SendClientCommand(netuser.networkPlayer, "chat.add [Color #ff00ff]PM to "..targetName.." "..rust.QuoteSafe(message).."")
+        self:SendChatMessage(targetNetuser, "from", senderName, message)
+        self:SendChatMessage(netuser, "to", targetName, message)
     else
         rust.SendChatMessage(netuser, "No PM found to reply to")
         return
@@ -99,7 +104,8 @@ function PLUGIN:ArgsToTable(args, src)
     return argsTbl
 end
 
-function PLUGIN:OnPlayerDisconnected(netuser)
+function PLUGIN:OnPlayerDisconnected(networkPlayer)
+    local netuser = networkPlayer:GetLocalData()
     local steamID = rust.UserIDFromPlayer(netuser)
     if pmHistory[steamID] then
         pmHistory[steamID] = nil
