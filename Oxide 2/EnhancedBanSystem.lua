@@ -1,28 +1,25 @@
 PLUGIN.Title        = "Enhanced Ban System"
 PLUGIN.Description  = "Ban system with advanced features"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(2, 2, 3)
-PLUGIN.HasConfig    = true
+PLUGIN.Version      = V(2, 3, 0)
 PLUGIN.ResourceID   = 693
 
 local debugMode = false
 
+
 function PLUGIN:Init()
-    command.AddChatCommand("ban", self.Object, "cmdBan")
-    command.AddChatCommand("unban", self.Object, "cmdUnban")
-    command.AddChatCommand("kick", self.Object, "cmdKick")
-    command.AddChatCommand("bancheck", self.Object, "cmdBanCheck")
-    command.AddConsoleCommand("player.ban", self.Object, "ccmdBan")
-    command.AddConsoleCommand("player.unban", self.Object, "ccmdUnban")
-    command.AddConsoleCommand("player.kick", self.Object, "ccmdKick")
     self:LoadDataFile()
     self:LoadDefaultConfig()
+    self:LoadCommands()
+    self:RegisterPermissions()
 end
 local plugin_RustDB
 function PLUGIN:OnServerInitialized()
     plugin_RustDB = plugins.Find("RustDB") or false
 end
-
+-- --------------------------------
+-- Handle data files
+-- --------------------------------
 local DataFile = "ebsbanlist"
 local BanData = {}
 function PLUGIN:LoadDataFile()
@@ -31,13 +28,20 @@ end
 function PLUGIN:SaveDataFile()
     datafile.SaveDataTable(DataFile)
 end
-
+-- --------------------------------
+-- Load the default configs
+-- --------------------------------
 function PLUGIN:LoadDefaultConfig()
     self.Config.Settings = self.Config.Settings or {}
     self.Config.Settings.BroadcastBans = self.Config.Settings.BroadcastBans or "false"
     self.Config.Settings.LogToConsole = self.Config.Settings.LogToConsole or "true"
     self.Config.Settings.CheckUsableByEveryone = self.Config.Settings.CheckUsableByEveryone or "false"
     self.Config.Settings.ChatName = self.Config.Settings.ChatName or "SERVER"
+    -- Permission settings
+    self.Config.Settings.Permissions = self.Config.Settings.Permissions or {}
+    self.Config.Settings.Permissions.Ban = self.Config.Settings.Permissions.Ban or "canban"
+    self.Config.Settings.Permissions.Kick = self.Config.Settings.Permissions.Kick or "cankick"
+    self.Config.Settings.Permissions.BanCheck = self.Config.Settings.Permissions.BanCheck or "canbancheck"
     -- Messages
     self.Config.Messages = self.Config.Messages or {}
     self.Config.Messages.KickMessage = self.Config.Messages.KickMessage or "An admin kicked you for {reason}"
@@ -47,16 +51,90 @@ function PLUGIN:LoadDefaultConfig()
     self:SaveConfig()
 end
 -- --------------------------------
--- admin permission check
+-- Load chat and console commands
 -- --------------------------------
-local function IsAdmin(player)
-    return player:GetComponent("BaseNetworkable").net.connection.authLevel > 0
+function PLUGIN:LoadCommands()
+    command.AddChatCommand("ban", self.Object, "cmdBan")
+    command.AddChatCommand("unban", self.Object, "cmdUnban")
+    command.AddChatCommand("kick", self.Object, "cmdKick")
+    command.AddChatCommand("bancheck", self.Object, "cmdBanCheck")
+    command.AddConsoleCommand("player.ban", self.Object, "ccmdBan")
+    command.AddConsoleCommand("player.unban", self.Object, "ccmdUnban")
+    command.AddConsoleCommand("player.kick", self.Object, "ccmdKick")
+    command.AddConsoleCommand("player.bancheck", self.Object, "ccmdBanCheck")
+    command.AddConsoleCommand("ebs.debug", self.Object, "ccmdDebug")
+end
+-- --------------------------------
+-- Register permissions
+-- --------------------------------
+function PLUGIN:RegisterPermissions()
+    for _, perm in pairs(self.Config.Settings.Permissions) do
+        if not permission.PermissionExists(perm) then
+            permission.RegisterPermission(perm, self.Object)
+        end
+    end
+end
+-- --------------------------------
+-- try to find a BasePlayer
+-- returns (int) numFound, (table) playerTbl
+-- --------------------------------
+local function FindPlayer(NameOrIpOrSteamID, checkSleeper)
+    local playerTbl = {}
+    local enumPlayerList = global.BasePlayer.activePlayerList:GetEnumerator()
+    while enumPlayerList:MoveNext() do
+        local currPlayer = enumPlayerList.Current
+        local currSteamID = rust.UserIDFromPlayer(currPlayer)
+        local currIP = currPlayer.net.connection.ipaddress
+        if currPlayer.displayName == NameOrIpOrSteamID or currSteamID == NameOrIpOrSteamID or currIP == NameOrIpOrSteamID then
+            table.insert(playerTbl, currPlayer)
+            return #playerTbl, playerTbl
+        end
+        local matched, _ = string.find(currPlayer.displayName:lower(), NameOrIpOrSteamID:lower(), 1, true)
+        if matched then
+            table.insert(playerTbl, currPlayer)
+        end
+    end
+    if checkSleeper then
+        local enumSleeperList = global.BasePlayer.sleepingPlayerList:GetEnumerator()
+        while enumSleeperList:MoveNext() do
+            local currPlayer = enumSleeperList.Current
+            local currSteamID = rust.UserIDFromPlayer(currPlayer)
+            if currPlayer.displayName == NameOrIpOrSteamID or currSteamID == NameOrIpOrSteamID then
+                table.insert(playerTbl, currPlayer)
+                return #playerTbl, playerTbl
+            end
+            local matched, _ = string.find(currPlayer.displayName:lower(), NameOrIpOrSteamID:lower(), 1, true)
+            if matched then
+                table.insert(playerTbl, currPlayer)
+            end
+        end
+    end
+    return #playerTbl, playerTbl
+end
+-- --------------------------------
+-- prints to server console
+-- --------------------------------
+local function printToConsole(msg)
+    global.ServerConsole.PrintColoured(System.ConsoleColor.Cyan, msg)
+end
+-- --------------------------------
+-- permission check
+-- --------------------------------
+local function HasPermission(player, perm)
+    local steamID = rust.UserIDFromPlayer(player)
+    if player:GetComponent("BaseNetworkable").net.connection.authLevel == 2 then
+        return true
+    end
+    if permission.UserHasPermission(steamID, perm) then
+        return true
+    end
+    return false
 end
 -- --------------------------------
 -- error and debug reporting
 -- --------------------------------
 local pluginTitle = PLUGIN.Title
-local pluginVersion = string.match(tostring(PLUGIN.Version), "(%d+.%d+.%d+)")
+local pluginVersion = tostring(PLUGIN.Version):match("(%d+.%d+.%d+)")
 local function error(msg)
     local message = "[Error] "..pluginTitle.."(v"..pluginVersion.."): "..msg
     local array = util.TableToArray({message})
@@ -74,7 +152,7 @@ end
 -- --------------------------------
 function PLUGIN:CleanUpBanList()
     local now = time.GetUnixTimestamp()
-    for key, value in pairs(BanData) do
+    for key, _ in pairs(BanData) do
         if BanData[key].expiration < now and BanData[key].expiration ~= 0 then
             BanData[key] = nil
             self:SaveDataFile()
@@ -106,209 +184,390 @@ end
 -- --------------------------------
 -- handles chat command /ban
 -- --------------------------------
-function PLUGIN:cmdBan(player, cmd, args)
+function PLUGIN:cmdBan(player, _, args)
     local args = self:ArgsToTable(args, "chat")
     local target, reason, duration = args[1], args[2], args[3]
-    if not IsAdmin(player) then
+    local perm = self.Config.Settings.Permissions.Ban
+    if not HasPermission(player, perm) then
         rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     if not reason then
-        rust.SendChatMessage(player, "Syntax: \"/ban <name|steamID|ip> <reason> <time[m|h|d] (optional)>\"")
+        rust.SendChatMessage(player, "Syntax: /ban <name|steamID|ip> <reason> <time[m|h|d] (optional)>")
         return
     end
-    local targetPlayer = global.BasePlayer.Find(target)
-    if not targetPlayer then
+    local numFound, targetPlayerTbl = FindPlayer(target, true)
+    if numFound == 0 then
         rust.SendChatMessage(player, "Player not found")
         return
     end
-    self:Ban(player, targetPlayer, reason, duration)
+    if numFound > 1 then
+        local targetNameString
+        for i = 1, numFound do
+            targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
+        end
+        rust.SendChatMessage(player, "Found more than one player, be more specific:")
+        rust.SendChatMessage(player, targetNameString)
+        return
+    end
+    local targetPlayer = targetPlayerTbl[1]
+    self:Ban(player, targetPlayer, reason, duration, nil)
 end
 -- --------------------------------
 -- handles console command player.ban
 -- --------------------------------
 function PLUGIN:ccmdBan(arg)
-    local player
+    local player, F1Console
+    local perm = self.Config.Settings.Permissions.Ban
     if arg.connection then
         player = arg.connection.player
     end
-    if player and not IsAdmin(player) then
+    if player then F1Console = true end
+    if F1Console and not HasPermission(player, perm) then
         arg:ReplyWith("You dont have permission to use this command")
         return true
     end
     local args = self:ArgsToTable(arg, "console")
     local target, reason, duration = args[1], args[2], args[3]
-    if player and not IsAdmin(player) then
-        rust.SendChatMessage(player, "You dont have permission to use this command")
-        return
-    end
     if not reason then
-        print("Syntax: \"player.ban <name|steamID|ip> <reason> <time[m|h|d] (optional)>\"")
+        if F1Console then
+            arg:ReplyWith("Syntax: player.ban <name|steamID|ip> <reason> <time[m|h|d] (optional)>")
+        else
+            printToConsole("Syntax: player.ban <name|steamID|ip> <reason> <time[m|h|d] (optional)>")
+        end
         return
     end
-    local targetPlayer = global.BasePlayer.Find(target)
-    if not targetPlayer then
-        print("Player not found")
+    local numFound, targetPlayerTbl = FindPlayer(target, true)
+    if numFound == 0 then
+        if F1Console then
+            arg:ReplyWith("Player not found")
+        else
+            printToConsole("Player not found")
+        end
         return
     end
-    self:Ban(player, targetPlayer, reason, duration)
+    if numFound > 1 then
+        local targetNameString
+        for i = 1, numFound do
+            targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
+        end
+        if F1Console then
+            arg:ReplyWith("Found more than one player, be more specific:")
+            for i = 1, numFound do
+                arg:ReplyWith(targetPlayerTbl[i].displayName)
+            end
+        else
+            printToConsole("Found more than one player, be more specific:")
+            for i = 1, numFound do
+                printToConsole(targetPlayerTbl[i].displayName)
+            end
+        end
+        return
+    end
+    local targetPlayer = targetPlayerTbl[1]
+    self:Ban(player, targetPlayer, reason, duration, arg)
 end
 -- --------------------------------
 -- handles chat command /unban
 -- --------------------------------
-function PLUGIN:cmdUnban(player, cmd, args)
+function PLUGIN:cmdUnban(player, _, args)
     local args = self:ArgsToTable(args, "chat")
     local target = args[1]
-    if not IsAdmin(player) then
+    local perm = self.Config.Settings.Permissions.Ban
+    if not HasPermission(player, perm) then
         rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     if not target then
-        rust.SendChatMessage(player, "Syntax: \"/unban <name|steamID|ip>\"")
+        rust.SendChatMessage(player, "Syntax: /unban <name|steamID|ip>")
         return
     end
-    self:UnBan(player, target)
+    self:UnBan(player, target, nil)
 end
 -- --------------------------------
 -- handles console command player.unban
 -- --------------------------------
 function PLUGIN:ccmdUnban(arg)
-    local player
+    local player, F1Console
+    local perm = self.Config.Settings.Permissions.Ban
     if arg.connection then
         player = arg.connection.player
     end
-    if player and not IsAdmin(player) then
+    if player then F1Console = true end
+    if player and not HasPermission(player, perm) then
         arg:ReplyWith("You dont have permission to use this command")
         return true
     end
     local args = self:ArgsToTable(arg, "console")
     local target = args[1]
     if not target then
-        print("Syntax: \"player.unban <name|steamID|ip>\"")
+        if F1Console then
+            arg:ReplyWith("Syntax: player.unban <name|steamID|ip>")
+        else
+            printToConsole("Syntax: player.unban <name|steamID|ip>")
+        end
         return
     end
-    self:UnBan(player, target)
+    self:UnBan(player, target, arg)
 end
 -- --------------------------------
 -- handles chat command /kick
 -- --------------------------------
-function PLUGIN:cmdKick(player, cmd, args)
+function PLUGIN:cmdKick(player, _, args)
     local args = self:ArgsToTable(args, "chat")
     local target, reason = args[1], args[2]
-    if not IsAdmin(player) then
+    local perm = self.Config.Settings.Permissions.Kick
+    if not HasPermission(player, perm) then
         rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     if not reason then
-        rust.SendChatMessage(player, "Syntax: \"/kick <name|steamID|ip> <reason>\"")
+        rust.SendChatMessage(player, "Syntax: /kick <name|steamID|ip> <reason>")
         return
     end
-    local targetPlayer = global.BasePlayer.Find(target)
-    if not targetPlayer then
+    local numFound, targetPlayerTbl = FindPlayer(target, false)
+    if numFound == 0 then
         rust.SendChatMessage(player, "Player not found")
         return
     end
-    self:Kick(player, targetPlayer, reason)
+    if numFound > 1 then
+        local targetNameString
+        for i = 1, numFound do
+            targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
+        end
+        rust.SendChatMessage(player, "Found more than one player, be more specific:")
+        rust.SendChatMessage(player, targetNameString)
+        return
+    end
+    local targetPlayer = targetPlayerTbl[1]
+    self:Kick(player, targetPlayer, reason, nil)
 end
 -- --------------------------------
 -- handles console command player.kick
 -- --------------------------------
 function PLUGIN:ccmdKick(arg)
-    local player
+    local player, F1Console
+    local perm = self.Config.Settings.Permissions.Kick
     if arg.connection then
         player = arg.connection.player
     end
-    if player and not IsAdmin(player) then
+    if player then F1Console = true end
+    if F1Console and not HasPermission(player, perm) then
         arg:ReplyWith("You dont have permission to use this command")
         return true
     end
     local args = self:ArgsToTable(arg, "console")
     local target, reason = args[1], args[2]
     if not reason then
-        print("Syntax: \"player.kick <name|steamID|ip> <reason>\"")
+        if F1Console then
+            arg:ReplyWith("Syntax: player.kick <name|steamID|ip> <reason>")
+        else
+            printToConsole("Syntax: player.kick <name|steamID|ip> <reason>")
+        end
         return
     end
-    local targetPlayer = global.BasePlayer.Find(target)
-    if not targetPlayer then
-        print("Player not found")
+    local numFound, targetPlayerTbl = FindPlayer(target, false)
+    if numFound == 0 then
+        if F1Console then
+            arg:ReplyWith("Player not found")
+        else
+            printToConsole("Player not found")
+        end
         return
     end
-    self:Kick(player, targetPlayer, reason)
+    if numFound > 1 then
+        local targetNameString
+        for i = 1, numFound do
+            targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
+        end
+        if F1Console then
+            arg:ReplyWith("Found more than one player, be more specific:")
+            for i = 1, numFound do
+                arg:ReplyWith(targetPlayerTbl[i].displayName)
+            end
+        else
+            printToConsole("Found more than one player, be more specific:")
+            for i = 1, numFound do
+                printToConsole(targetPlayerTbl[i].displayName)
+            end
+        end
+        return
+    end
+    local targetPlayer = targetPlayerTbl[1]
+    self:Kick(player, targetPlayer, reason, arg)
 end
 -- --------------------------------
 -- handles chat command /bancheck
 -- --------------------------------
-function PLUGIN:cmdBanCheck(player, cmd, args)
+function PLUGIN:cmdBanCheck(player, _, args)
+    debug("## [EBS debug] cmdBanCheck() ##")
     local args = self:ArgsToTable(args, "chat")
+    local perm = self.Config.Settings.Permissions.BanCheck
     local target = args[1]
-    if not IsAdmin(player) and self.Config.Settings.CheckUsableByEveryone == "false" then
+    debug("perm: "..perm)
+    debug("target: "..target)
+    if not HasPermissionn(player, perm) and self.Config.Settings.CheckUsableByEveryone == "false" then
         rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
     if not target then
-        rust.SendChatMessage(player, "Syntax: \"/bancheck <name|steamID|ip>\"")
+        rust.SendChatMessage(player, "Syntax: /bancheck <name|steamID|ip>")
         return
     end
+    self:BanCheck(player, target, nil)
+end
+-- --------------------------------
+-- handles console command player.bancheck
+-- --------------------------------
+function PLUGIN:ccmdBanCheck(arg)
+    debug("## [EBS debug] ccmdBanCheck() ##")
+    local player, F1Console
+    local perm = self.Config.Settings.Permissions.Kick
+    if arg.connection then
+        player = arg.connection.player
+    end
+    if player then F1Console = true end
+    local args = self:ArgsToTable(arg, "console")
+    local target = args[1]
+    debug("perm: "..perm)
+    debug("target: "..target)
+    if F1Console and not HasPermissionn(player, perm) and self.Config.Settings.CheckUsableByEveryone == "false" then
+        arg:ReplyWith("You dont have permission to use this command")
+        return
+    end
+    if not target then
+        if F1Console then
+            arg:ReplyWith("Syntax: /bancheck <name|steamID|ip>")
+        else
+            printToConsole("Syntax: /bancheck <name|steamID|ip>")
+        end
+        return
+    end
+    self:BanCheck(player, target, arg)
+end
+-- --------------------------------
+-- checks if target is banned
+-- --------------------------------
+function PLUGIN:BanCheck(player, target, arg)
+    debug("## [EBS debug] BanCheck() ##")
+    -- define source of command trigger
+    local F1Console, srvConsole, chatCmd
+    if player and arg then F1Console = true end
+    if not player then srvConsole = true end
+    if player and not arg then chatCmd = true end
+    debug("F1Console: "..tostring(F1Console))
+    debug("srvConsole: "..tostring(srvConsole))
+    debug("chatCmd: "..tostring(chatCmd))
+    --
     local now = time.GetUnixTimestamp()
-    for key, value in pairs(BanData) do
+    for key, _ in pairs(BanData) do
         if BanData[key].name == target or BanData[key].steamID == target or BanData[key].IP == target then
             if BanData[key].expiration > now or BanData[key].expiration == 0 then
                 if BanData[key].expiration == 0 then
-                    rust.SendChatMessage(player, target.." is permanently banned")
+                    if F1Console then
+                        arg:ReplyWith(target.." is permanently banned")
+                    end
+                    if srvConsole then
+                        printToConsole(target.." is permanently banned")
+                    end
+                    if chatCmd then
+                        rust.SendChatMessage(player, target.." is permanently banned")
+                    end
                     return
                 else
                     local expiration = BanData[key].expiration
                     local bantime = expiration - now
-                    local days = string.format("%02.f", math.floor(bantime / 86400))
-                    local hours = string.format("%02.f", math.floor(bantime / 3600 - (days * 24)))
-                    local minutes = string.format("%02.f", math.floor(bantime / 60 - (days * 1440) - (hours * 60)))
-                    local seconds = string.format("%02.f", math.floor(bantime - (days * 86400) - (hours * 3600) - (minutes * 60)))
-                    rust.SendChatMessage(player, target.." is banned for "..tostring(days).." days "..tostring(hours).." hours "..tostring(minutes).." minutes "..tostring(seconds).." seconds")
+                    local days = tostring(math.floor(bantime / 86400)):format("%02.f")
+                    local hours = tostring(math.floor(bantime / 3600 - (days * 24))):format("%02.f")
+                    local minutes = tostring(math.floor(bantime / 60 - (days * 1440) - (hours * 60))):format("%02.f")
+                    local seconds = tostring(math.floor(bantime - (days * 86400) - (hours * 3600) - (minutes * 60))):format("%02.f")
+                    if F1Console then
+                        arg:ReplyWith(target.." is banned for "..tostring(days).." days "..tostring(hours).." hours "..tostring(minutes).." minutes "..tostring(seconds).." seconds")
+                    end
+                    if srvConsole then
+                        printToConsole(target.." is banned for "..tostring(days).." days "..tostring(hours).." hours "..tostring(minutes).." minutes "..tostring(seconds).." seconds")
+                    end
+                    if chatCmd then
+                        rust.SendChatMessage(player, target.." is banned for "..tostring(days).." days "..tostring(hours).." hours "..tostring(minutes).." minutes "..tostring(seconds).." seconds")
+                    end
                     return
                 end
             end
         end
     end
-    rust.SendChatMessage(player, target.." is not banned")
+    if F1Console then
+        arg:ReplyWith(target.." is not banned")
+    end
+    if srvConsole then
+        printToConsole(target.." is not banned")
+    end
+    if chatCmd then
+        rust.SendChatMessage(player, target.." is not banned")
+    end
 end
 -- --------------------------------
 -- kick player
 -- --------------------------------
-function PLUGIN:Kick(player, targetPlayer, reason)
+function PLUGIN:Kick(player, targetPlayer, reason, arg)
+    debug("## [EBS debug] Kick() ##")
     local targetName = targetPlayer.displayName
     local targetSteamID = rust.UserIDFromPlayer(targetPlayer)
     local targetInfo = targetName.." ("..targetSteamID..")"
+    debug("targetName: "..targetName)
+    debug("targetSteamID: "..targetSteamID)
+    -- define source of command trigger
+    local F1Console, srvConsole, chatCmd
+    if player and arg then F1Console = true end
+    if not player then srvConsole = true end
+    if player and not arg then chatCmd = true end
+    debug("F1Console: "..tostring(F1Console))
+    debug("srvConsole: "..tostring(srvConsole))
+    debug("chatCmd: "..tostring(chatCmd))
     -- Kick player
     local kickMsg = string.gsub(self.Config.Messages.KickMessage, "{reason}", reason)
     Network.Net.sv:Kick(targetPlayer.net.connection, kickMsg)
     -- Output the bans
     if self.Config.Settings.BroadcastBans == "true" then
         rust.BroadcastChat(self.Config.Settings.ChatName, targetName.." has been kicked for "..reason)
-    else
-        if player then
-            rust.SendChatMessage(player, targetName.." has been kicked for "..reason)
-        else
-            print(targetName.." has been kicked for "..reason)
-        end
+    end
+    if chatCmd and self.Config.Settings.BroadcastBans == "false" then
+        rust.SendChatMessage(player, targetName.." has been kicked for "..reason)
+    end
+    if F1Console then
+        arg:ReplyWith(targetName.." has been kicked for "..reason)
+    end
+    if srvConsole then
+        printToConsole(targetName.." has been kicked for "..reason)
     end
     if self.Config.Settings.LogToConsole == "true" then
         if player then
-            print(self.Title..": "..player.displayName.." kicked "..targetInfo)
+            printToConsole("[EBS]: "..player.displayName.." kicked "..targetInfo)
         else
-            print(self.Title..": Admin kicked "..targetInfo)
+            printToConsole("[EBS]: Admin kicked "..targetInfo)
         end
     end
 end
 -- --------------------------------
 -- unban player
 -- --------------------------------
-function PLUGIN:UnBan(player, target)
-    debug("unban target: "..target)
+function PLUGIN:UnBan(player, target, arg)
+    debug("## [EBS debug] UnBan() ##")
+    -- define source of command trigger
+    local F1Console, srvConsole, chatCmd
+    if player and arg then F1Console = true end
+    if not player then srvConsole = true end
+    if player and not arg then chatCmd = true end
+    debug("F1Console: "..tostring(F1Console))
+    debug("srvConsole: "..tostring(srvConsole))
+    debug("chatCmd: "..tostring(chatCmd))
+    --
+    debug("target: "..target)
     for key, _ in pairs(BanData) do
         if BanData[key].name == target or BanData[key].steamID == target or BanData[key].IP == target then
             debug("ban found")
             -- Send unban request to RustDB
             if plugin_RustDB then
+                debug("RustDB found")
                 plugin_RustDB:RustDBUnban(BanData[key].steamID)
             end
             -- remove from banlist
@@ -318,50 +577,82 @@ function PLUGIN:UnBan(player, target)
             BanData[key].expiration = nil
             BanData[key].reason = nil
             BanData[key] = nil
-            debug("bandata nil: "..tostring(BanData[key] == nil))
+            debug("ban entry deleted: "..tostring(BanData[key] == nil))
             self:SaveDataFile()
             -- Output the bans
             if self.Config.Settings.BroadcastBans == "true" then
                 rust.BroadcastChat(self.Config.Settings.ChatName, target.." has been unbanned")
-            else
-                if player then
-                    rust.SendChatMessage(player, target.." has been unbanned")
-                else
-                    print(target.." has been unbanned")
-                end
+            end
+            if chatCmd then
+                rust.SendChatMessage(player, target.." has been unbanned")
+            end
+            if F1Console then
+                arg:ReplyWith(target.." has been unbanned")
+            end
+            if srvConsole then
+                printToConsole(target.." has been unbanned")
             end
             if self.Config.Settings.LogToConsole == "true" then
                 if player then
-                    print(self.Title..": "..player.displayName.." unbanned "..target)
+                    printToConsole("[EBS]: "..player.displayName.." unbanned "..target)
                 else
-                    print(self.Title..": Admin unbanned "..target)
+                    printToConsole("[EBS]: Admin unbanned "..target)
                 end
             end
             return
         end
     end
-    if player then
+    if chatCmd then
         rust.SendChatMessage(player, target.." not found in banlist")
-    else
-        print(target.." not found in banlist")
+    end
+    if F1Console then
+        arg:ReplyWith(target.." not found in banlist")
+    end
+    if srvConsole then
+        printToConsole(target.." not found in banlist")
     end
 end
 -- --------------------------------
 -- ban player
 -- --------------------------------
-function PLUGIN:Ban(player, targetPlayer, reason, duration)
+function PLUGIN:Ban(player, targetPlayer, reason, duration, arg)
+    debug("## [EBS debug] Ban() ##")
+    -- define source of command trigger
+    local F1Console, srvConsole, chatCmd
+    if player and arg then F1Console = true end
+    if not player then srvConsole = true end
+    if player and not arg then chatCmd = true end
+    debug("F1Console: "..tostring(F1Console))
+    debug("srvConsole: "..tostring(srvConsole))
+    debug("chatCmd: "..tostring(chatCmd))
+    --
     local targetName = targetPlayer.displayName
-    local targetIP = targetPlayer.net.connection.ipaddress:match("([^:]*):")
+    local targetOffline = targetPlayer.net.connection == nil
+    debug("targetOffline: "..tostring(targetOffline))
+    local targetIP
+    if targetOffline then
+        targetIP = "0.0.0.0"
+    else
+        targetIP = targetPlayer.net.connection.ipaddress:match("([^:]*):")
+    end
     local targetSteamID = rust.UserIDFromPlayer(targetPlayer)
+    debug("targetName: "..targetName)
+    debug("targetIP: "..targetIP)
+    debug("targetSteamID: "..targetSteamID)
     -- Check if player is already banned
     local now = time.GetUnixTimestamp()
-    for key, value in pairs(BanData) do
+    for key, _ in pairs(BanData) do
         if BanData[key].steamID == targetSteamID then
             if BanData[key].expiration > now or BanData[key].expiration == 0 then
-                if player then
+                debug("player already banned")
+                if chatCmd then
                     rust.SendChatMessage(player, targetName.." is already banned!")
-                else
-                    print(targetName.." is already banned!")
+                end
+                if F1Console then
+                    arg:ReplyWith(targetName.." is already banned!")
+                end
+                if srvConsole then
+                    printToConsole(targetName.." is already banned!")
                 end
                 return
             else
@@ -370,6 +661,7 @@ function PLUGIN:Ban(player, targetPlayer, reason, duration)
         end
     end
     if not duration then -- If no time is given ban permanently
+        debug("no duration")
         local expiration = 0
         -- Insert data into the banlist
         BanData[targetSteamID] = {}
@@ -380,45 +672,58 @@ function PLUGIN:Ban(player, targetPlayer, reason, duration)
         BanData[targetSteamID].reason = reason
         table.insert(BanData, BanData[targetSteamID])
         self:SaveDataFile()
+        debug("ban entry saved to file")
         -- Send ban to RustDB
         if plugin_RustDB then
+            debug("RustDB found")
             plugin_RustDB:RustDBBan(player, targetName, targetSteamID, reason)
         end
         -- Kick target from server
-        debug("kicked: "..targetName)
-        local BanMsg = string.gsub(self.Config.Messages.BanMessage, "{reason}", reason)
-        Network.Net.sv:Kick(targetPlayer.net.connection, BanMsg)
+        local BanMsg = self.Config.Messages.BanMessage:gsub("{reason}", reason)
+        if not targetOffline then
+            Network.Net.sv:Kick(targetPlayer.net.connection, BanMsg)
+            debug("targetPlayer kicked")
+        end
         -- Output bans
         if self.Config.Settings.BroadcastBans == "true" then
             rust.BroadcastChat(self.Config.Settings.ChatName, targetName.." has been permanently banned")
-        else
-            if player then
-                rust.SendChatMessage(player, targetName.." has been permanently banned")
-            else
-                print(targetName.." has been permanently banned")
-            end
+        end
+        if chatCmd then
+            rust.SendChatMessage(player, targetName.." has been permanently banned")
+        end
+        if F1Console then
+            arg:ReplyWith(targetName.." has been permanently banned")
+        end
+        if srvConsole then
+            printToConsole(targetName.." has been permanently banned")
         end
         if self.Config.Settings.LogToConsole == "true" then
             if player then
-                print(self.Title..": "..player.displayName.." permanently banned "..targetName.." for "..reason)
+                printToConsole("[EBS]: "..player.displayName.." permanently banned "..targetName.." for "..reason)
             else
-                print(self.Title..": Admin permanently banned "..targetName.." for "..reason)
+                printToConsole("[EBS]: Admin permanently banned "..targetName.." for "..reason)
             end
         end
     else -- if time is given, ban for time
+        debug("duration: "..duration)
         -- Check if time input is a valid format
-        if string.len(duration) < 2 or not string.match(duration, "^%d*[mhd]$") then
-            if player then
+        if duration:len() < 2 or not duration:match("^%d*[mhd]$") then
+            debug("invalid time format")
+            if chatCmd then
                 rust.SendChatMessage(player, "Invalid time format")
-            else
-                print("Invalid time format")
+            end
+            if F1Console then
+                arg:ReplyWith("Invalid time format")
+            end
+            if srvConsole then
+                printToConsole("Invalid time format")
             end
             return
         end
         -- Build time format
         local now = time.GetUnixTimestamp()
-        local banTime = tonumber(string.sub(duration, 1, -2))
-        local timeUnit = string.sub(duration, -1)
+        local banTime = tonumber(duration:sub(1, -2))
+        local timeUnit = duration:sub(-1)
         local timeMult, timeUnitLong
         if timeUnit == "m" then
             timeMult = 60
@@ -439,26 +744,32 @@ function PLUGIN:Ban(player, targetPlayer, reason, duration)
         BanData[targetSteamID].IP = targetIP
         BanData[targetSteamID].reason = reason
         table.insert(BanData, BanData[targetSteamID])
+        debug("ban entry saved to fiile")
         self:SaveDataFile()
         -- Kick target from server
-        debug("kicked: "..targetName)
-        local BanMsg = string.gsub(self.Config.Messages.BanMessage, "{reason}", reason)
-        Network.Net.sv:Kick(targetPlayer.net.connection, BanMsg)
+        local BanMsg = self.Config.Messages.BanMessage:gsub("{reason}", reason)
+        if not targetOffline then
+            Network.Net.sv:Kick(targetPlayer.net.connection, BanMsg)
+            debug("targetPlayer kicked")
+        end
         -- Output bans
         if self.Config.Settings.BroadcastBans == "true" then
             rust.BroadcastChat(self.Config.Settings.ChatName, targetName.." has been banned for "..banTime.." "..timeUnitLong)
-        else
-            if player then
-                rust.SendChatMessage(player, targetName.." has been banned for "..banTime.." "..timeUnitLong)
-            else
-                print(targetName.." has been banned for "..banTime.." "..timeUnitLong)
-            end
+        end
+        if chatCmd then
+            rust.SendChatMessage(player, targetName.." has been banned for "..banTime.." "..timeUnitLong)
+        end
+        if F1Console then
+            arg:ReplyWith(targetName.." has been banned for "..banTime.." "..timeUnitLong)
+        end
+        if srvConsole then
+            printToConsole(targetName.." has been banned for "..banTime.." "..timeUnitLong)
         end
         if self.Config.Settings.LogToConsole == "true" then
             if player then
-                print(self.Title..": "..player.displayName.." banned "..targetName.." for "..banTime.." "..timeUnitLong.." for "..reason)
+                printToConsole("[EBS]: "..player.displayName.." banned "..targetName.." for "..banTime.." "..timeUnitLong.." for "..reason)
             else
-                print(self.Title..": Admin banned "..targetName.." for "..banTime.." "..timeUnitLong.." for "..reason)
+                printToConsole("[EBS]: Admin banned "..targetName.." for "..banTime.." "..timeUnitLong.." for "..reason)
             end
         end
     end
@@ -472,7 +783,7 @@ function PLUGIN:CanClientLogin(connection)
     local name = connection.username
     local userInfo = name.." ("..steamID..")"
     local now = time.GetUnixTimestamp()
-    for key, value in pairs(BanData) do
+    for key, _ in pairs(BanData) do
         if BanData[key].steamID == steamID or BanData[key].IP == ip then
             if BanData[key].expiration < now and BanData[key].expiration ~= 0 then
                 self:CleanUpBanList()
@@ -480,16 +791,32 @@ function PLUGIN:CanClientLogin(connection)
             else
                 debug(userInfo.." connection denied")
                 if self.Config.Settings.LogToConsole == "true" then
-                    print(self.Title..": "..userInfo.." connection denied")
+                    printToConsole("[EBS]: "..userInfo.." connection denied")
                 end
                 return self.Config.Messages.DenyConnection
             end
         else
             if BanData[key].name == name then
-                print(self.Title..": Warning! the name from "..userInfo.." has been banned but is using another steam account now!")
-                print(self.Title..": It might be the same person with another account or just someone else with the same name. Judge it by yourself")
+                printToConsole("[EBS]: Warning! the name from "..userInfo.." has been banned but is using another steam account now!")
+                printToConsole("[EBS]: It might be the same person with another account or just someone else with the same name. Judge it by yourself")
             end
         end
+    end
+end
+-- --------------------------------
+-- activate/deactivate debug mode
+-- --------------------------------
+function PLUGIN:ccmdDebug(arg)
+    if arg.connection then return end -- terminate if not server console
+    local args = self:ArgsToTable(arg, "console")
+    if args[1] == "true" then
+        debugMode = true
+        printToConsole("[EBS]: debug mode activated")
+    elseif args[1] == "false" then
+        debugMode = false
+        printToConsole("[EBS]: debug mode deactivated")
+    else
+        printToConsole("Syntax: ebs.debug true/false")
     end
 end
 -- --------------------------------
