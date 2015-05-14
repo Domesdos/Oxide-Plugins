@@ -1,7 +1,7 @@
 PLUGIN.Title        = "FriendsAPI"
 PLUGIN.Description  = "An API to manage friends"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(1, 2, 2)
+PLUGIN.Version      = V(1, 2, 3)
 PLUGIN.ResourceID   = 686
 
 local debugMode = false
@@ -164,7 +164,7 @@ function PLUGIN:cmdFriend(player, _, args)
         return
     end
     if numFound > 1 then
-        local targetNameString
+        local targetNameString = ""
         for i = 1, numFound do
             targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
         end
