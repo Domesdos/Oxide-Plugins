@@ -1,8 +1,8 @@
 PLUGIN.Title        = "Enhanced Ban System"
 PLUGIN.Description  = "Ban system with advanced features"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(2, 3, 0)
-PLUGIN.ResourceID   = 693
+PLUGIN.Version      = V(2, 3, 2)
+PLUGIN.ResourceId   = 693
 
 local debugMode = false
 
@@ -131,21 +131,11 @@ local function HasPermission(player, perm)
     return false
 end
 -- --------------------------------
--- error and debug reporting
+-- debug print
 -- --------------------------------
-local pluginTitle = PLUGIN.Title
-local pluginVersion = tostring(PLUGIN.Version):match("(%d+.%d+.%d+)")
-local function error(msg)
-    local message = "[Error] "..pluginTitle.."(v"..pluginVersion.."): "..msg
-    local array = util.TableToArray({message})
-    UnityEngine.Debug.LogError.methodarray[0]:Invoke(nil, array)
-    print(message)
-end
 local function debug(msg)
     if not debugMode then return end
-    local message = "[Debug] "..pluginTitle.."(v"..pluginVersion.."): "..msg
-    local array = util.TableToArray({message})
-    UnityEngine.Debug.LogWarning.methodarray[0]:Invoke(nil, array)
+    global.ServerConsole.PrintColoured(System.ConsoleColor.Yellow, msg)
 end
 -- --------------------------------
 -- removes expired bans
@@ -202,7 +192,7 @@ function PLUGIN:cmdBan(player, _, args)
         return
     end
     if numFound > 1 then
-        local targetNameString
+        local targetNameString = ""
         for i = 1, numFound do
             targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
         end
@@ -247,7 +237,7 @@ function PLUGIN:ccmdBan(arg)
         return
     end
     if numFound > 1 then
-        local targetNameString
+        local targetNameString = ""
         for i = 1, numFound do
             targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
         end
@@ -331,7 +321,7 @@ function PLUGIN:cmdKick(player, _, args)
         return
     end
     if numFound > 1 then
-        local targetNameString
+        local targetNameString = ""
         for i = 1, numFound do
             targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
         end
@@ -376,7 +366,7 @@ function PLUGIN:ccmdKick(arg)
         return
     end
     if numFound > 1 then
-        local targetNameString
+        local targetNameString = ""
         for i = 1, numFound do
             targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
         end
@@ -406,7 +396,7 @@ function PLUGIN:cmdBanCheck(player, _, args)
     local target = args[1]
     debug("perm: "..perm)
     debug("target: "..target)
-    if not HasPermissionn(player, perm) and self.Config.Settings.CheckUsableByEveryone == "false" then
+    if not HasPermission(player, perm) and self.Config.Settings.CheckUsableByEveryone == "false" then
         rust.SendChatMessage(player, "You dont have permission to use this command")
         return
     end
@@ -430,8 +420,8 @@ function PLUGIN:ccmdBanCheck(arg)
     local args = self:ArgsToTable(arg, "console")
     local target = args[1]
     debug("perm: "..perm)
-    debug("target: "..target)
-    if F1Console and not HasPermissionn(player, perm) and self.Config.Settings.CheckUsableByEveryone == "false" then
+    debug("target: "..tostring(target))
+    if F1Console and not HasPermission(player, perm) and self.Config.Settings.CheckUsableByEveryone == "false" then
         arg:ReplyWith("You dont have permission to use this command")
         return
     end
@@ -561,14 +551,14 @@ function PLUGIN:UnBan(player, target, arg)
     debug("srvConsole: "..tostring(srvConsole))
     debug("chatCmd: "..tostring(chatCmd))
     --
-    debug("target: "..target)
+    debug("target: "..tostring(target))
     for key, _ in pairs(BanData) do
         if BanData[key].name == target or BanData[key].steamID == target or BanData[key].IP == target then
             debug("ban found")
             -- Send unban request to RustDB
             if plugin_RustDB then
                 debug("RustDB found")
-                plugin_RustDB:RustDBUnban(BanData[key].steamID)
+                plugin_RustDB:Call("RustDBUnban", BanData[key].steamID)
             end
             -- remove from banlist
             BanData[key].name = nil
@@ -637,7 +627,7 @@ function PLUGIN:Ban(player, targetPlayer, reason, duration, arg)
     end
     local targetSteamID = rust.UserIDFromPlayer(targetPlayer)
     debug("targetName: "..targetName)
-    debug("targetIP: "..targetIP)
+    debug("targetIP: "..tostring(targetIP))
     debug("targetSteamID: "..targetSteamID)
     -- Check if player is already banned
     local now = time.GetUnixTimestamp()
@@ -676,7 +666,7 @@ function PLUGIN:Ban(player, targetPlayer, reason, duration, arg)
         -- Send ban to RustDB
         if plugin_RustDB then
             debug("RustDB found")
-            plugin_RustDB:RustDBBan(player, targetName, targetSteamID, reason)
+            plugin_RustDB:Call("RustDBBan", player, targetName, targetSteamID, reason)
         end
         -- Kick target from server
         local BanMsg = self.Config.Messages.BanMessage:gsub("{reason}", reason)
