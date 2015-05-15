@@ -2,7 +2,6 @@ PLUGIN.Title = "Private Messaging"
 PLUGIN.Description = "Allows users to chat private with each other"
 PLUGIN.Author = "#Domestos"
 PLUGIN.Version = V(1, 2, 4)
-PLUGIN.HasConfig = false
 PLUGIN.ResourceID = 659
 
 
@@ -51,7 +50,7 @@ end
 -- --------------------------------
 -- Chat command for pm
 -- --------------------------------
-function PLUGIN:cmdPm(player, cmd, args)
+function PLUGIN:cmdPm(player, _, args)
     if not player then return end
     local args = self:ArgsToTable(args, "chat")
     local target, message = args[1], ""
@@ -91,7 +90,7 @@ end
 -- --------------------------------
 -- Chat command for reply
 -- --------------------------------
-function PLUGIN:cmdReply(player, cmd, args)
+function PLUGIN:cmdReply(player, _, args)
     if not player then return end
     local senderName = player.displayName
     local senderSteamID = rust.UserIDFromPlayer(player)
