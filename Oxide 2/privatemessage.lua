@@ -1,7 +1,7 @@
 PLUGIN.Title = "Private Messaging"
 PLUGIN.Description = "Allows users to chat private with each other"
 PLUGIN.Author = "#Domestos"
-PLUGIN.Version = V(1, 2, 3)
+PLUGIN.Version = V(1, 2, 4)
 PLUGIN.HasConfig = false
 PLUGIN.ResourceID = 659
 
@@ -11,7 +11,43 @@ function PLUGIN:Init()
     command.AddChatCommand("pm", self.Object, "cmdPm")
     command.AddChatCommand("r", self.Object, "cmdReply")
 end
-
+-- --------------------------------
+-- try to find a BasePlayer
+-- returns (int) numFound, (table) playerTbl
+-- --------------------------------
+local function FindPlayer(NameOrIpOrSteamID, checkSleeper)
+    local playerTbl = {}
+    local enumPlayerList = global.BasePlayer.activePlayerList:GetEnumerator()
+    while enumPlayerList:MoveNext() do
+        local currPlayer = enumPlayerList.Current
+        local currSteamID = rust.UserIDFromPlayer(currPlayer)
+        local currIP = currPlayer.net.connection.ipaddress
+        if currPlayer.displayName == NameOrIpOrSteamID or currSteamID == NameOrIpOrSteamID or currIP == NameOrIpOrSteamID then
+            table.insert(playerTbl, currPlayer)
+            return #playerTbl, playerTbl
+        end
+        local matched, _ = string.find(currPlayer.displayName:lower(), NameOrIpOrSteamID:lower(), 1, true)
+        if matched then
+            table.insert(playerTbl, currPlayer)
+        end
+    end
+    if checkSleeper then
+        local enumSleeperList = global.BasePlayer.sleepingPlayerList:GetEnumerator()
+        while enumSleeperList:MoveNext() do
+            local currPlayer = enumSleeperList.Current
+            local currSteamID = rust.UserIDFromPlayer(currPlayer)
+            if currPlayer.displayName == NameOrIpOrSteamID or currSteamID == NameOrIpOrSteamID then
+                table.insert(playerTbl, currPlayer)
+                return #playerTbl, playerTbl
+            end
+            local matched, _ = string.find(currPlayer.displayName:lower(), NameOrIpOrSteamID:lower(), 1, true)
+            if matched then
+                table.insert(playerTbl, currPlayer)
+            end
+        end
+    end
+    return #playerTbl, playerTbl
+end
 -- --------------------------------
 -- Chat command for pm
 -- --------------------------------
@@ -29,11 +65,21 @@ function PLUGIN:cmdPm(player, cmd, args)
         rust.SendChatMessage(player, "Syntax: /pm <name> <message>")
         return
     end
-    local targetPlayer = global.BasePlayer.Find(target)
-    if not targetPlayer then
+    local numFound, targetPlayerTbl = FindPlayer(target, false)
+    if numFound == 0 then
         rust.SendChatMessage(player, "Player not found")
         return
     end
+    if numFound > 1 then
+        local targetNameString = ""
+        for i = 1, numFound do
+            targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
+        end
+        rust.SendChatMessage(player, "Found more than one player, be more specific:")
+        rust.SendChatMessage(player, targetNameString)
+        return
+    end
+    local targetPlayer = targetPlayerTbl[1]
     local senderName = player.displayName
     local senderSteamID = rust.UserIDFromPlayer(player)
     local targetName = targetPlayer.displayName
@@ -62,11 +108,21 @@ function PLUGIN:cmdReply(player, cmd, args)
         return
     end
     if pmHistory[senderSteamID] then
-        local targetPlayer = global.BasePlayer.Find(pmHistory[senderSteamID])
-        if not targetPlayer then
-            rust.SendChatMessage(player, "Player is offline")
+        local numFound, targetPlayerTbl = FindPlayer(pmHistory[senderSteamID], false)
+        if numFound == 0 then
+            rust.SendChatMessage(player, "Player not found")
             return
         end
+        if numFound > 1 then
+            local targetNameString = ""
+            for i = 1, numFound do
+                targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
+            end
+            rust.SendChatMessage(player, "Found more than one player, be more specific:")
+            rust.SendChatMessage(player, targetNameString)
+            return
+        end
+        local targetPlayer = targetPlayerTbl[1]
         local targetName = targetPlayer.displayName
         rust.SendChatMessage(targetPlayer, "<color=#ff00ff>PM from "..senderName.."</color>", message, senderSteamID)
         rust.SendChatMessage(player, "<color=#ff00ff>PM to "..targetName.."</color>", message, senderSteamID)
