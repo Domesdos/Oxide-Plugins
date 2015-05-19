@@ -20,6 +20,7 @@ function PLUGIN:LoadDefaultConfig()
     -- General Settings
     self.Config.Settings.General                        = self.Config.Settings.General or {}
     self.Config.Settings.General.BroadcastMutes         = self.Config.Settings.General.BroadcastMutes or "true"
+    self.Config.Settings.General.LogToConsole           = self.Config.Settings.Gerenal.LogToConsole or "true"
     -- Chat commands
     self.Config.Settings.ChatCommands                   = self.Config.Settings.ChatCommands or {}
     self.Config.Settings.ChatCommands.Mute              = self.Config.Settings.ChatCommands.Mute or {"mute"}
@@ -30,10 +31,6 @@ function PLUGIN:LoadDefaultConfig()
     self.Config.Settings.Permissions.Mute               = self.Config.Settings.Permissions.Mute or "canmute"
     self.Config.Settings.Permissions.GlobalMute         = self.Config.Settings.Permissions.GlobalMute or "canglobalmute"
     self.Config.Settings.Permissions.AntiGlobalMute     = self.Config.Settings.Permissions.AntiGlobalMute or "notglobalmuted"
-    -- Logging settings
-    self.Config.Settings.Logging                        = self.Config.Settings.Logging or {}
-    self.Config.Settings.Logging.LogToConsole           = self.Config.Settings.Logging.LogToConsole or "true"
-    self.Config.Settings.Logging.LogBlockedMessages     = self.Config.Settings.Logging.LogBlockedMessages or "true"
     -- Messages
     self.Config.Messages                                = self.Config.Messages or {}
     -- admin messages
@@ -193,27 +190,24 @@ end
 -- expirationDate (timestamp) if muted for specific time
 -- false (bool) if not muted
 -- --------------------------------
-function PLUGIN:IsMuted(targetSteamID)
+function PLUGIN:IsMuted(player)
     local now = time.GetUnixTimestamp()
-    if not muteData[targetSteamID] then return false end
+    local targetSteamID = rust.UserIDFromPlayer(player)
+    if GlobalMute and not HasPermission(player, self.Config.Settings.Permissions.AntiGlobalMute) then
+        return true
+    end
+    if not muteData[targetSteamID] then
+        return false
+    end
     if muteData[targetSteamID].expiration < now and muteData[targetSteamID].expiration ~= 0 then
         muteData[targetSteamID] = nil
         datafile.SaveDataTable(MuteList)
         return false
     end
     if muteData[targetSteamID].expiration == 0 then
-        return 0
+        return true
     else
         return muteData[targetSteamID].expiration
-        --[[
-        local expiration = muteData[targetSteamID].expiration
-        local muteTime = expiration - now
-        local hours = string.format("%02.f", math.floor(muteTime / 3600))
-        local minutes = string.format("%02.f", math.floor(muteTime / 60 - (hours * 60)))
-        local seconds = string.format("%02.f", math.floor(muteTime - (hours * 3600) - (minutes * 60)))
-        local expirationString = tostring(hours.."h "..minutes.."m "..seconds.."s")
-        return expirationString
-        ]]
     end
     return false
 end
@@ -371,7 +365,7 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
             rust.SendChatMessage(targetPlayer, self.Config.Messages.Player.Muted)
         end
         -- Send console log
-        if self.Config.Settings.Logging.LogToConsole == "true" then
+        if self.Config.Settings.General.LogToConsole == "true" then
             if not player then
                 printToConsole("[ChatMute] An admin muted "..targetName)
             else
@@ -438,7 +432,7 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
         end
     end
     -- Send console log
-    if self.Config.Settings.Logging.LogToConsole == "true" then
+    if self.Config.Settings.General.LogToConsole == "true" then
         if not player then
             printToConsole("[ChatMute] An admin muted "..targetName.." for "..muteTime.." "..timeUnitLong)
         else
@@ -589,7 +583,7 @@ function PLUGIN:Unmute(player, targetPlayer, arg)
             end
         end
         -- Send console log
-        if self.Config.Settings.Logging.LogToConsole == "true" then
+        if self.Config.Settings.General.LogToConsole == "true" then
             if player then
                 printToConsole("[ChatMute] "..player.displayName.." unmuted "..targetName)
             else
@@ -618,18 +612,14 @@ function PLUGIN:OnRunCommand(arg)
     local cmd = arg.cmd.namefull
     local msg = arg:GetString(0, "text")
     local player = arg.connection.player
-    local steamID = rust.UserIDFromPlayer(player)
     if cmd == "chat.say" and msg:sub(1, 1) ~= "/" then
         if GlobalMute and not HasPermission(player, self.Config.Settings.Permissions.AntiGlobalMute) then
             rust.SendChatMessage(player, self.Config.Messages.Player.GlobalMuted)
             return true
         end
-        local IsMuted = self:IsMuted(steamID)
+        local IsMuted = self:IsMuted(player)
         if not IsMuted then return end
-        if IsMuted == 0 then
-            rust.SendChatMessage(player, self.Config.Messages.Player.IsMuted)
-            return true
-        else
+        if IsMuted > 0 then
             local expiration = IsMuted
             local muteTime = expiration - now
             local hours = math.floor(muteTime / 3600):format("%02.f")
@@ -637,6 +627,9 @@ function PLUGIN:OnRunCommand(arg)
             local seconds = math.floor(muteTime - (hours * 3600) - (minutes * 60)):format("%02.f")
             local expirationString = tostring(hours.."h "..minutes.."m "..seconds.."s")
             rust.SendChatMessage(player, buildOutput(self.Config.Messages.Player.IsTimeMuted, {"{timeMuted}"}, {expirationString}))
+            return true
+        else
+            rust.SendChatMessage(player, self.Config.Messages.Player.IsMuted)
             return true
         end
     end
