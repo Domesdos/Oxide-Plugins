@@ -1,7 +1,7 @@
 PLUGIN.Title        = "Chat Handler"
 PLUGIN.Description  = "Chat modification and moderation suite"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(3, 0, 0)
+PLUGIN.Version      = V(3, 0, 1)
 PLUGIN.ResourceId   = 707
 
 local debugMode = false
@@ -146,6 +146,7 @@ function PLUGIN:LoadDefaultConfig()
             ["PrefixColor"] = "#06DCFB",
             ["NameColor"] = "#5af",
             ["TextColor"] = "#ffffff",
+            ["PriorityRank"] = 4,
             ["ShowPrefix"] = true
         },
         ["VIP"] = {
@@ -155,15 +156,17 @@ function PLUGIN:LoadDefaultConfig()
             ["PrefixColor"] = "#59ff4a",
             ["NameColor"] = "#5af",
             ["TextColor"] = "#ffffff",
+            ["PriorityRank"] = 3,
             ["ShowPrefix"] = true,
         },
         ["Admin"] = {
             ["Permission"] = "admin",
             ["Prefix"] = "[Admin]",
             ["PrefixPosition"] = "left",
-            ["PrefixColor"] = "#FFA04A",
+            ["PrefixColor"] = "#FF7F50",
             ["NameColor"] = "#5af",
             ["TextColor"] = "#ffffff",
+            ["PriorityRank"] = 5,
             ["ShowPrefix"] = true,
         },
         ["Moderator"] = {
@@ -173,15 +176,17 @@ function PLUGIN:LoadDefaultConfig()
             ["PrefixColor"] = "#FFA04A",
             ["NameColor"] = "#5af",
             ["TextColor"] = "#ffffff",
+            ["PriorityRank"] = 2,
             ["ShowPrefix"] = true,
         },
         ["Player"] = {
             ["Permission"] = "player",
             ["Prefix"] = "[Player]",
             ["PrefixPosition"] = "left",
-            ["PrefixColor"] = "#FFA04A",
+            ["PrefixColor"] = "#ffffff",
             ["NameColor"] = "#5af",
             ["TextColor"] = "#ffffff",
+            ["PriorityRank"] = 1,
             ["ShowPrefix"] = false,
         }
     }
@@ -321,7 +326,7 @@ function PLUGIN:BroadcastChat(player, name, msg)
             local targetSteamID = rust.UserIDFromPlayer(targetPlayer)
             local hasIgnored = eIgnoreAPI:Call("HasIgnored", targetSteamID, senderSteamID)
             if not hasIgnored then
-                rust.SendChatMessage(targetPlayer, name, msg)
+                rust.SendChatMessage(targetPlayer, name, msg, senderSteamID)
             end
         end
         return
@@ -578,6 +583,7 @@ function PLUGIN:BuildNameMessage(player, msg)
         return username, message, logUsername, logMessage
     end
     if self.Config.Settings.General.EnableChatGroups == "true" then
+        local priorityRank = 0
         for key, _ in pairs(self.Config.ChatGroups) do
             if permission.UserHasPermission(steamID, self.Config.ChatGroups[key].Permission) then
                 if self.Config.ChatGroups[key].ShowPrefix then
@@ -591,7 +597,10 @@ function PLUGIN:BuildNameMessage(player, msg)
                 else
                     username = "<color="..self.Config.ChatGroups[key].NameColor..">"..username.."</color>"
                 end
-                message = "<color="..self.Config.ChatGroups[key].TextColor..">"..message.."</color>"
+                if self.Config.ChatGroups[key].PriorityRank > priorityRank then
+                    priorityRank = self.Config.ChatGroups[key].PriorityRank
+                    message = "<color="..self.Config.ChatGroups[key].TextColor..">"..msg.."</color>"
+                end
             end
         end
     end
