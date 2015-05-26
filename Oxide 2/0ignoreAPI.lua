@@ -1,8 +1,8 @@
-PLUGIN.Title = "Ignore List API"
-PLUGIN.Description = "An API to manage an ignore list"
-PLUGIN.Author = "#Domestos"
-PLUGIN.Version = V(1, 0, 0)
-
+PLUGIN.Title        = "Ignore List API"
+PLUGIN.Description  = "An API to manage an ignore list"
+PLUGIN.Author       = "#Domestos"
+PLUGIN.Version      = V(1, 0, 0)
+PLUGIN.ResourceId   = _
 
 local debugMode = false
 
