@@ -1,14 +1,18 @@
-PLUGIN.Title = "Private Messaging"
-PLUGIN.Description = "Allows users to chat private with each other"
-PLUGIN.Author = "#Domestos"
-PLUGIN.Version = V(1, 2, 4)
-PLUGIN.ResourceID = 659
+PLUGIN.Title        = "Private Messaging"
+PLUGIN.Description  = "Allows users to chat private with each other"
+PLUGIN.Author       = "#Domestos"
+PLUGIN.Version      = V(1, 2, 5)
+PLUGIN.ResourceId   = 659
 
 
 local pmHistory = {}
 function PLUGIN:Init()
     command.AddChatCommand("pm", self.Object, "cmdPm")
     command.AddChatCommand("r", self.Object, "cmdReply")
+end
+local eIgnoreAPI
+function PLUGIN:OnServerInitialized()
+    eIgnoreAPI = plugins.Find("0ignoreAPI") or false
 end
 -- --------------------------------
 -- try to find a BasePlayer
@@ -83,6 +87,13 @@ function PLUGIN:cmdPm(player, _, args)
     local senderSteamID = rust.UserIDFromPlayer(player)
     local targetName = targetPlayer.displayName
     local targetSteamID = rust.UserIDFromPlayer(targetPlayer)
+    if eIgnoreAPI then
+        local hasIgnored = eIgnoreAPI:Call("HasIgnored", targetSteamID, senderSteamID)
+        if hasIgnored then
+            rust.SendChatMessage(player, targetName.."<color=red> is ignoring you and cant recieve your PMs</color>")
+            return
+        end
+    end
     rust.SendChatMessage(targetPlayer, "<color=#ff00ff>PM from "..senderName.."</color>", message, senderSteamID)
     rust.SendChatMessage(player, "<color=#ff00ff>PM to "..targetName.."</color>", message, senderSteamID)
     pmHistory[targetSteamID] = senderSteamID
@@ -122,13 +133,23 @@ function PLUGIN:cmdReply(player, _, args)
             return
         end
         local targetPlayer = targetPlayerTbl[1]
+        local targetSteamID = rust.UserIDFromPlayer(targetPlayer)
         local targetName = targetPlayer.displayName
+        if eIgnoreAPI then
+            local hasIgnored = eIgnoreAPI:Call("HasIgnored", targetSteamID, senderSteamID)
+            if hasIgnored then
+                rust.SendChatMessage(player, targetName.."<color=red> is ignoring you and cant recieve your PMs</color>")
+                return
+            end
+        end
         rust.SendChatMessage(targetPlayer, "<color=#ff00ff>PM from "..senderName.."</color>", message, senderSteamID)
         rust.SendChatMessage(player, "<color=#ff00ff>PM to "..targetName.."</color>", message, senderSteamID)
+        pmHistory[targetSteamID] = senderSteamID
     else
         rust.SendChatMessage(player, "No PM found to reply to")
         return
     end
+
 end
 -- --------------------------------
 -- returns args as a table
