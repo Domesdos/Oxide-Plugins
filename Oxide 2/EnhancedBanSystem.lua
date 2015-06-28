@@ -1,7 +1,7 @@
 PLUGIN.Title        = "Enhanced Ban System"
 PLUGIN.Description  = "Ban system with advanced features"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(2, 3, 2)
+PLUGIN.Version      = V(2, 3, 3)
 PLUGIN.ResourceId   = 693
 
 local debugMode = false
@@ -15,7 +15,7 @@ function PLUGIN:Init()
 end
 local plugin_RustDB
 function PLUGIN:OnServerInitialized()
-    plugin_RustDB = plugins.Find("RustDB") or false
+    plugin_RustDB = plugins.Find("RustDB")
 end
 -- --------------------------------
 -- Handle data files
@@ -115,14 +115,15 @@ end
 -- prints to server console
 -- --------------------------------
 local function printToConsole(msg)
-    global.ServerConsole.PrintColoured(System.ConsoleColor.Cyan, msg)
+    --global.ServerConsole.PrintColoured(System.ConsoleColor.Cyan, msg)
+    UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({msg}))
 end
 -- --------------------------------
 -- permission check
 -- --------------------------------
 local function HasPermission(player, perm)
     local steamID = rust.UserIDFromPlayer(player)
-    if player:GetComponent("BaseNetworkable").net.connection.authLevel == 2 then
+    if permission.UserHasPermission(steamID, "admin") then
         return true
     end
     if permission.UserHasPermission(steamID, perm) then
@@ -135,7 +136,8 @@ end
 -- --------------------------------
 local function debug(msg)
     if not debugMode then return end
-    global.ServerConsole.PrintColoured(System.ConsoleColor.Yellow, msg)
+    --global.ServerConsole.PrintColoured(System.ConsoleColor.Yellow, msg)
+    UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({"[Debug] "..msg}))
 end
 -- --------------------------------
 -- removes expired bans
@@ -556,10 +558,12 @@ function PLUGIN:UnBan(player, target, arg)
         if BanData[key].name == target or BanData[key].steamID == target or BanData[key].IP == target then
             debug("ban found")
             -- Send unban request to RustDB
+        --[[
             if plugin_RustDB then
                 debug("RustDB found")
                 plugin_RustDB:Call("RustDBUnban", BanData[key].steamID)
             end
+        ]]
             -- remove from banlist
             BanData[key].name = nil
             BanData[key].steamID = nil
@@ -664,10 +668,12 @@ function PLUGIN:Ban(player, targetPlayer, reason, duration, arg)
         self:SaveDataFile()
         debug("ban entry saved to file")
         -- Send ban to RustDB
+    --[[
         if plugin_RustDB then
             debug("RustDB found")
             plugin_RustDB:Call("RustDBBan", player, targetName, targetSteamID, reason)
         end
+    ]]
         -- Kick target from server
         local BanMsg = self.Config.Messages.BanMessage:gsub("{reason}", reason)
         if not targetOffline then
