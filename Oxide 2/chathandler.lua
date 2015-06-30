@@ -1,7 +1,7 @@
 PLUGIN.Title        = "Chat Handler"
 PLUGIN.Description  = "Chat modification and moderation suite"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(3, 0, 1)
+PLUGIN.Version      = V(3, 1, 0)
 PLUGIN.ResourceId   = 707
 
 local debugMode = false
@@ -20,7 +20,7 @@ local eRanksAndTitles, eIgnoreAPI, eChatMute
 -- --------------------------------
 function PLUGIN:Init()
     self:LoadDefaultConfig()
-    self:LoadChatCommands()
+    self:LoadCommands()
     self:LoadDataFiles()
     self:RegisterPermissions()
 end
@@ -30,9 +30,9 @@ function PLUGIN:OnServerInitialized()
     eIgnoreAPI = plugins.Find("0ignoreAPI") or false
 end
 -- --------------------------------
--- debug reporting
+-- Debug reporting
 -- --------------------------------
-local function debug(msg)
+local function Debug(msg)
     if not debugMode then return end
     --global.ServerConsole.PrintColoured(System.ConsoleColor.Yellow, msg)
     UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({"[Debug] "..msg}))
@@ -53,7 +53,7 @@ end
 -- --------------------------------
 -- builds output messages by replacing wildcards
 -- --------------------------------
-local function buildOutput(str, tags, replacements)
+local function BuildOutput(str, tags, replacements)
     for i = 1, #tags do
         str = str:gsub(tags[i], replacements[i])
     end
@@ -62,17 +62,17 @@ end
 -- --------------------------------
 -- print functions
 -- --------------------------------
-local function printToConsole(msg)
+local function PrintToConsole(msg)
     --global.ServerConsole.PrintColoured(System.ConsoleColor.Cyan, msg)
     UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({msg}))
 end
-local function printToFile(msg)
-    global.server.Log(LogFile, msg.."\n")
+local function PrintToFile(msg)
+    ConVar.Server.Log(LogFile, msg.."\n")
 end
 -- --------------------------------
 -- splits chat messages longer than maxCharsPerLine characters into multilines
 -- --------------------------------
-local function splitLongMessages(msg, maxCharsPerLine)
+local function SplitLongMessages(msg, maxCharsPerLine)
     local length = msg:len()
     local msgTbl = {}
     if length > 128 then
@@ -81,7 +81,7 @@ local function splitLongMessages(msg, maxCharsPerLine)
     if length > maxCharsPerLine then
         while length > maxCharsPerLine do
             local subStr = msg:sub(1, maxCharsPerLine)
-            local first, last = string.find(subStr:reverse(), " ")
+            local first, last = subStr:reverse():find(" ")
             if first then
                 subStr = subStr:sub(1, -first)
             end
@@ -98,44 +98,47 @@ end
 -- --------------------------------
 -- generates default config
 -- --------------------------------
+local settings, wordfilter, chatgroups, messages
 function PLUGIN:LoadDefaultConfig() 
-    self.Config.Settings                                = self.Config.Settings or {}
+    self.Config.Settings                    = self.Config.Settings or {}
+    settings = self.Config.Settings
     -- General Settings
-    self.Config.Settings.General                        = self.Config.Settings.General or {}
-    self.Config.Settings.General.MaxCharsPerLine        = self.Config.Settings.General.MaxCharsPerLine or 64
-    self.Config.Settings.General.BlockServerAds         = self.Config.Settings.General.BlockServerAds or "true"
-    self.Config.Settings.General.AllowedIPsToPost       = self.Config.Settings.General.AllowedIPsToPost or {}
-    self.Config.Settings.General.EnableChatHistory      = self.Config.Settings.General.EnableChatHistory or "true"
-    self.Config.Settings.General.ChatHistoryMaxLines    = self.Config.Settings.General.ChatHistoryMaxLines or 10
-    self.Config.Settings.General.EnableChatGroups       = self.Config.Settings.General.EnableChatGroups or "true"
+    settings.General                        = settings.General or {}
+    settings.General.MaxCharsPerLine        = settings.General.MaxCharsPerLine or 80
+    settings.General.BlockServerAds         = settings.General.BlockServerAds or "true"
+    settings.General.AllowedIPsToPost       = settings.General.AllowedIPsToPost or {}
+    settings.General.EnableChatHistory      = settings.General.EnableChatHistory or "true"
+    settings.General.ChatHistoryMaxLines    = settings.General.ChatHistoryMaxLines or 10
+    settings.General.EnableChatGroups       = settings.General.EnableChatGroups or "true"
     -- Wordfilter settings
-    self.Config.Settings.Wordfilter                     = self.Config.Settings.Wordfilter or {}
-    self.Config.Settings.Wordfilter.EnableWordfilter    = self.Config.Settings.Wordfilter.EnableWordfilter or "false"
-    self.Config.Settings.Wordfilter.ReplaceFullWord     = self.Config.Settings.Wordfilter.ReplaceFullWord or "true"
+    settings.Wordfilter                     = settings.Wordfilter or {}
+    settings.Wordfilter.EnableWordfilter    = settings.Wordfilter.EnableWordfilter or "false"
+    settings.Wordfilter.ReplaceFullWord     = settings.Wordfilter.ReplaceFullWord or "true"
+    settings.Wordfilter.AllowPunish         = settings.Wordfilter.AllowPunish or "false"
     -- Chat commands
-    self.Config.Settings.ChatCommands                   = self.Config.Settings.ChatCommands or {}
-    self.Config.Settings.ChatCommands.AdminMode         = self.Config.Settings.ChatCommands.AdminMode or {"admin"}
-    self.Config.Settings.ChatCommands.ChatHistory       = self.Config.Settings.ChatCommands.ChatHistory or {"history", "h"}
-    self.Config.Settings.ChatCommands.Wordfilter        = self.Config.Settings.ChatCommands.Wordfilter or {"wordfilter"}
+    settings.ChatCommands                   = settings.ChatCommands or {}
+    settings.ChatCommands.AdminMode         = settings.ChatCommands.AdminMode or {"admin"}
+    settings.ChatCommands.ChatHistory       = settings.ChatCommands.ChatHistory or {"history", "h"}
+    settings.ChatCommands.Wordfilter        = settings.ChatCommands.Wordfilter or {"wordfilter"}
     -- command permissions
-    self.Config.Settings.Permissions                    = self.Config.Settings.Permissions or {}
-    self.Config.Settings.Permissions.AdminMode          = self.Config.Settings.Permissions.AdminMode or "canadminmode"
-    self.Config.Settings.Permissions.EditWordFilter     = self.Config.Settings.Permissions.EditWordFilter or "caneditwordfilter"
+    settings.Permissions                    = settings.Permissions or {}
+    settings.Permissions.AdminMode          = settings.Permissions.AdminMode or "canadminmode"
+    settings.Permissions.EditWordFilter     = settings.Permissions.EditWordFilter or "caneditwordfilter"
     -- Logging settings
-    self.Config.Settings.Logging                        = self.Config.Settings.Logging or {}
-    self.Config.Settings.Logging.LogToConsole           = self.Config.Settings.Logging.LogToConsole or "true"
-    self.Config.Settings.Logging.LogBlockedMessages     = self.Config.Settings.Logging.LogBlockedMessages or "true"
-    self.Config.Settings.Logging.LogToFile              = self.Config.Settings.Logging.LogToFile or "false"
+    settings.Logging                        = settings.Logging or {}
+    settings.Logging.LogToConsole           = settings.Logging.LogToConsole or "true"
+    settings.Logging.LogBlockedMessages     = settings.Logging.LogBlockedMessages or "true"
+    settings.Logging.LogToFile              = settings.Logging.LogToFile or "false"
     -- Admin mode settings
-    self.Config.Settings.AdminMode                      = self.Config.Settings.AdminMode or {}
-    self.Config.Settings.AdminMode.ChatName             = self.Config.Settings.AdminMode.ChatName or "[Server Admin]"
-    self.Config.Settings.AdminMode.NameColor            = self.Config.Settings.AdminMode.NameColor or "#ff8000"
-    self.Config.Settings.AdminMode.TextColor            = self.Config.Settings.AdminMode.TextColor or "#ff8000"
+    settings.AdminMode                      = settings.AdminMode or {}
+    settings.AdminMode.ChatName             = settings.AdminMode.ChatName or "[Server Admin]"
+    settings.AdminMode.NameColor            = settings.AdminMode.NameColor or "#ff8000"
+    settings.AdminMode.TextColor            = settings.AdminMode.TextColor or "#ff8000"
     -- Antispam settings
-    self.Config.Settings.AntiSpam                       = self.Config.Settings.AntiSpam or {}
-    self.Config.Settings.AntiSpam.EnableAntiSpam        = self.Config.Settings.AntiSpam.EnableAntiSpam or "true"
-    self.Config.Settings.AntiSpam.MaxLines              = self.Config.Settings.AntiSpam.MaxLines or 4
-    self.Config.Settings.AntiSpam.TimeFrame             = self.Config.Settings.AntiSpam.TimeFrame or 6
+    settings.AntiSpam                       = settings.AntiSpam or {}
+    settings.AntiSpam.EnableAntiSpam        = settings.AntiSpam.EnableAntiSpam or "true"
+    settings.AntiSpam.MaxLines              = settings.AntiSpam.MaxLines or 4
+    settings.AntiSpam.TimeFrame             = settings.AntiSpam.TimeFrame or 6
 
     -- Chatgroups
     self.Config.ChatGroups = self.Config.ChatGroups or {
@@ -190,91 +193,79 @@ function PLUGIN:LoadDefaultConfig()
             ["ShowPrefix"] = false,
         }
     }
-        -- Wordfilter
+    chatgroups = self.Config.ChatGroups
+
+    -- Wordfilter
     self.Config.WordFilter = self.Config.WordFilter or {
         ["bitch"] = "sweety",
         ["fucking hell"] = "lovely heaven",
-        ["cunt"] = "****"
+        ["cunt"] = "****",
+        ["hurensohn"] = {"mute", "muted for hurensohn"}
     }
+    wordfilter = self.Config.WordFilter
     -- Check wordfilter for conflicts
-    if self.Config.Settings.Wordfilter.EnableWordfilter == "true" then
-        for key, value in pairs(self.Config.WordFilter) do
-            local first, _ = string.find(value:lower(), key:lower())
-            if first then
-                self.Config.WordFilter[key] = nil
-                print("Config error in wordfilter: [\""..key.."\":\""..value.."\"] both contain the same word")
-                print("[\""..key.."\":\""..value.."\"] was removed from word filter")
+    if settings.Wordfilter.EnableWordfilter == "true" then
+        for key, value in pairs(wordfilter) do
+            if type(value) ~= "table" then
+                local first, _ = string.find(value:lower(), key:lower())
+                if first then
+                    wordfilter[key] = nil
+                    print("Config error in wordfilter: [\""..key.."\":\""..value.."\"] both contain the same word")
+                    print("[\""..key.."\":\""..value.."\"] was removed from word filter")
+                end
             end
         end
     end
-    -- message settings
-    self.Config.Messages                                             = self.Config.Messages or {}
-    -- player messages
-    self.Config.Messages.PlayerNotifications                         = self.Config.Messages.PlayerNotifications or {}
-    self.Config.Messages.PlayerNotifications.AutoMuted               = self.Config.Messages.PlayerNotifications.AutoMuted or "You got {punishTime} auto muted for spam"
-    self.Config.Messages.PlayerNotifications.SpamWarning             = self.Config.Messages.PlayerNotifications.SpamWarning or "If you keep spamming your punishment will raise"
-    self.Config.Messages.PlayerNotifications.BroadcastAutoMutes      = self.Config.Messages.PlayerNotifications.BroadcastAutoMuted or "{name} got {punishTime} auto muted for spam"
-    self.Config.Messages.PlayerNotifications.AdWarning               = self.Config.Messages.PlayerNotifications.AdWarning or "Its not allowed to advertise other servers"
-    self.Config.Messages.PlayerNotifications.NoChatHistory           = self.Config.Messages.PlayerNotifications.NoChatHistory or "No chat history found"
-    self.Config.Messages.PlayerNotifications.WordfilterList          = self.Config.Messages.PlayerNotifications.WordfilterList or "Blacklisted words: {wordFilterList}"
-    -- admin messages
-    self.Config.Messages.AdminNotifications                          = self.Config.Messages.AdminNotifications or {}
-    self.Config.Messages.AdminNotifications.NoPermission             = self.Config.Messages.AdminNotifications.NoPermission or "You dont have permission to use this command"
-    self.Config.Messages.AdminNotifications.AdminModeEnabled         = self.Config.Messages.AdminNotifications.AdminModeEnabled or "You are now in admin mode"
-    self.Config.Messages.AdminNotifications.AdminModeDisabled        = self.Config.Messages.AdminNotifications.AdminModeDisabled or "Admin mode disabled"
-    self.Config.Messages.AdminNotifications.WordfilterError          = self.Config.Messages.AdminNotifications.WordfilterError or "Error: {replacement} contains the word {word}"
-    self.Config.Messages.AdminNotifications.WordfilterAdded          = self.Config.Messages.AdminNotifications.WordfilterAdded or "WordFilter added. {word} will now be replaced with {replacement}"
-    self.Config.Messages.AdminNotifications.WordfilterRemoved        = self.Config.Messages.AdminNotifications.WordfilterRemoved or "successfully removed {word} from the wordfilter"
-    self.Config.Messages.AdminNotifications.WordfilterNotFound       = self.Config.Messages.AdminNotifications.WordfilterNotFound or "No filter for {word} found to remove"
-    -- helptext messages
-    self.Config.Messages.Helptext                                    = self.Config.Messages.Helptext or {}
-    self.Config.Messages.Helptext.Wordfilter                         = self.Config.Messages.Helptext.Wordfilter or "Use /wordfilter list to see blacklisted words"
-    self.Config.Messages.Helptext.ChatHistory                        = self.Config.Messages.Helptext.ChatHistory or "Use /history or /h to view recent chat history"
 
-    -- removed config entries
-        -- removed in v2.3.4
-    self.Config.Settings.Logging.LogChatToOxide = nil
-        -- removed in v2.4
-    self.Config.AllowedIPsToPost = nil
-    self.Config.Settings.BroadcastMutes = nil
-    self.Config.Settings.BlockServerAds = nil
-    self.Config.Settings.EnableWordFilter = nil
-    self.Config.Settings.EnableChatHistory = nil
-    self.Config.Settings.ChatHistoryMaxLines = nil
-    self.Config.Settings.AdminMode.ChatCommand = nil
-    self.Config.Settings.HelpText = nil
-        -- removed in v3
-    self.Config.Settings.General.Language = nil
-    self.Config.Settings.General.BroadcastMutes = nil
-    self.Config.Settings.ChatCommands.Mute = nil
-    self.Config.Settings.ChatCommands.Unmute = nil
-    self.Config.Settings.ChatCommands.GlobalMute = nil
-    self.Config.Settings.Permissions.Mute = nil
-    self.Config.Settings.Permissions.GlobalMute = nil
-    self.Config.Settings.Permissions.AntiGlobalMute = nil
-    self.Config.Settings.Groups = nil
-    self.Config.Settings.NameColor = nil
-    self.Config.Settings.AdminMode.ReplaceChatName = nil
-    --
+    -- message settings
+    self.Config.Messages                = self.Config.Messages or {}
+    messages = self.Config.Messages
+    -- player messages
+    messages.Player                     = messages.PlayerNotifications or messages.Player or {}
+    messages.Player.AutoMuted           = messages.Player.AutoMuted or "You got {punishTime} auto muted for spam"
+    messages.Player.SpamWarning         = messages.Player.SpamWarning or "If you keep spamming your punishment will raise"
+    messages.Player.BroadcastAutoMutes  = messages.Player.BroadcastAutoMuted or "{name} got {punishTime} auto muted for spam"
+    messages.Player.AdWarning           = messages.Player.AdWarning or "Its not allowed to advertise other servers"
+    messages.Player.NoChatHistory       = messages.Player.NoChatHistory or "No chat history found"
+    messages.Player.WordfilterList      = messages.Player.WordfilterList or "Blacklisted words: {wordFilterList}"
+    -- admin messages
+    messages.Admin                      = messages.AdminNotifications or messages.Admin or {}
+    messages.Admin.NoPermission         = messages.Admin.NoPermission or "You dont have permission to use this command"
+    messages.Admin.AdminModeEnabled     = messages.Admin.AdminModeEnabled or "You are now in admin mode"
+    messages.Admin.AdminModeDisabled    = messages.Admin.AdminModeDisabled or "Admin mode disabled"
+    messages.Admin.WordfilterError      = messages.Admin.WordfilterError or "Error: {replacement} contains the word {word}"
+    messages.Admin.WordfilterAdded      = messages.Admin.WordfilterAdded or "WordFilter added. {word} will now be replaced with {replacement}"
+    messages.Admin.WordfilterRemoved    = messages.Admin.WordfilterRemoved or "successfully removed {word} from the wordfilter"
+    messages.Admin.WordfilterNotFound   = messages.Admin.WordfilterNotFound or "No filter for {word} found to remove"
+    -- helptext messages
+    messages.Helptext                   = messages.Helptext or {}
+    messages.Helptext.Wordfilter        = messages.Helptext.Wordfilter or "Use /wordfilter list to see blacklisted words"
+    messages.Helptext.ChatHistory       = messages.Helptext.ChatHistory or "Use /history or /h to view recent chat history"
+
+    -- remove old entries
+    messages.PlayerNotifications = nil
+    messages.AdminNotifications = nil
+    
     self:SaveConfig()
 end
 -- --------------------------------
 -- load all chat commands, depending on settings
 -- --------------------------------
-function PLUGIN:LoadChatCommands()
-    for _, cmd in pairs(self.Config.Settings.ChatCommands.AdminMode) do
+function PLUGIN:LoadCommands()
+    for _, cmd in pairs(settings.ChatCommands.AdminMode) do
         command.AddChatCommand(cmd, self.Object, "cmdAdminMode")
     end
-    if self.Config.Settings.General.EnableChatHistory == "true" then
-        for _, cmd in pairs(self.Config.Settings.ChatCommands.ChatHistory) do
+    if settings.General.EnableChatHistory == "true" then
+        for _, cmd in pairs(settings.ChatCommands.ChatHistory) do
             command.AddChatCommand(cmd, self.Object, "cmdHistory")
         end
     end
-    if self.Config.Settings.Wordfilter.EnableWordfilter== "true" then
-        for _, cmd in pairs(self.Config.Settings.ChatCommands.Wordfilter) do
+    if settings.Wordfilter.EnableWordfilter == "true" then
+        for _, cmd in pairs(settings.ChatCommands.Wordfilter) do
             command.AddChatCommand(cmd, self.Object, "cmdEditWordFilter")
         end
     end
+    command.AddConsoleCommand("chathandler.debug", self.Object, "ccmdDebug")
 end
 -- --------------------------------
 -- handles all data files
@@ -287,23 +278,23 @@ end
 -- --------------------------------
 function PLUGIN:RegisterPermissions()
     -- command permissions
-    for _, perm in pairs(self.Config.Settings.Permissions) do
+    for _, perm in pairs(settings.Permissions) do
         if not permission.PermissionExists(perm) then
             permission.RegisterPermission(perm, self.Object)
         end
     end
     -- group permissions
-    if self.Config.Settings.General.EnableChatGroups == "true" then
-        for key, _ in pairs(self.Config.ChatGroups) do
-            if not permission.PermissionExists(self.Config.ChatGroups[key].Permission) then
-                permission.RegisterPermission(self.Config.ChatGroups[key].Permission, self.Object)
+    if settings.General.EnableChatGroups == "true" then
+        for key, _ in pairs(chatgroups) do
+            if not permission.PermissionExists(chatgroups[key].Permission) then
+                permission.RegisterPermission(chatgroups[key].Permission, self.Object)
             end
         end
         -- grant default groups default permissions
         local defaultGroups = {"Player", "Moderator", "Admin"}
         for i = 1, 3, 1 do
-            if not permission.GroupHasPermission(defaultGroups[i]:lower(), self.Config.ChatGroups[defaultGroups[i]].Permission) then
-                permission.GrantGroupPermission(defaultGroups[i]:lower(), self.Config.ChatGroups[defaultGroups[i]].Permission, self.Object)
+            if not permission.GroupHasPermission(defaultGroups[i]:lower(), chatgroups[defaultGroups[i]].Permission) then
+                permission.GrantGroupPermission(defaultGroups[i]:lower(), chatgroups[defaultGroups[i]].Permission, self.Object)
             end
         end
     end
@@ -313,9 +304,9 @@ end
 -- --------------------------------
 function PLUGIN:BroadcastChat(player, name, msg)
     local senderSteamID = rust.UserIDFromPlayer(player)
-    if AdminMode[steamID] then
+    if AdminMode[senderSteamID] then
         senderSteamID = 0
-        global.ConsoleSystem.Broadcast("chat.add", senderSteamID, name..": "..msg)
+        global.ConsoleSystem.Broadcast("chat.add", senderSteamID, name..msg)
         return
     end
     -- only send chat to people not ignoring sender
@@ -326,12 +317,13 @@ function PLUGIN:BroadcastChat(player, name, msg)
             local targetSteamID = rust.UserIDFromPlayer(targetPlayer)
             local hasIgnored = eIgnoreAPI:Call("HasIgnored", targetSteamID, senderSteamID)
             if not hasIgnored then
-                rust.SendChatMessage(targetPlayer, name, msg, senderSteamID)
+                targetPlayer:SendConsoleCommand("chat.add", senderSteamID, name..msg)
             end
         end
         return
     end
-    global.ConsoleSystem.Broadcast("chat.add", senderSteamID, name..": "..msg)
+    -- broadcast chat
+    global.ConsoleSystem.Broadcast("chat.add", senderSteamID, name..msg)
 end
 -- --------------------------------
 -- returns args as a table
@@ -359,17 +351,33 @@ end
 -- handles chat command /admin
 -- --------------------------------
 function PLUGIN:cmdAdminMode(player)
-    if not HasPermission(player, self.Config.Settings.Permissions.AdminMode) then
-        rust.SendChatMessage(player, self.Config.Messages.AdminNotifications.NoPermission)
+    if not HasPermission(player, settings.Permissions.AdminMode) then
+        rust.SendChatMessage(player, messages.Admin.NoPermission)
         return
     end
     local steamID = rust.UserIDFromPlayer(player)
     if AdminMode[steamID] then
         AdminMode[steamID] = nil
-        rust.SendChatMessage(player, self.Config.Messages.AdminNotifications.AdminModeDisabled)
+        rust.SendChatMessage(player, messages.Admin.AdminModeDisabled)
     else
         AdminMode[steamID] = true
-        rust.SendChatMessage(player, self.Config.Messages.AdminNotifications.AdminModeEnabled)
+        rust.SendChatMessage(player, messages.Admin.AdminModeEnabled)
+    end
+end
+-- --------------------------------
+-- activate/deactivate debug mode
+-- --------------------------------
+function PLUGIN:ccmdDebug(arg)
+    if arg.connection then return end -- terminate if not server console
+    local args = self:ArgsToTable(arg, "console")
+    if args[1] == "true" then
+        debugMode = true
+        PrintToConsole("[ChatHandler]: debug mode activated")
+    elseif args[1] == "false" then
+        debugMode = false
+        PrintToConsole("[ChatHandler]: debug mode deactivated")
+    else
+        PrintToConsole("Syntax: chathandler.debug true/false")
     end
 end
 -- --------------------------------
@@ -386,19 +394,19 @@ function PLUGIN:OnPlayerChat(arg)
         if isMuted then return end
     end
     -- Spam prevention
-    if eChatMute and self.Config.Settings.AntiSpam.EnableAntiSpam == "true" then
+    if eChatMute and settings.AntiSpam.EnableAntiSpam == "true" then
         local isSpam, punishTime = self:AntiSpamCheck(player)
         if isSpam then
-            rust.SendChatMessage(player, buildOutput(self.Config.Messages.PlayerNotifications.AutoMuted, {"{punishTime}"}, {punishTime}))
-            timer.Once(4, function() rust.SendChatMessage(player, self.Config.Messages.PlayerNotifications.SpamWarning) end)
-            if self.Config.Settings.General.BroadcastMutes == "true" then
-                rust.BroadcastChat(buildOutput(self.Config.Messages.PlayerNotifications.BroadcastAutoMuted, {"{name}", "{punishTime}"}, {player.displayName, punishTime}))
+            rust.SendChatMessage(player, BuildOutput(messages.Player.AutoMuted, {"{punishTime}"}, {punishTime}))
+            timer.Once(4, function() rust.SendChatMessage(player, messages.Player.SpamWarning) end)
+            if settings.General.BroadcastMutes == "true" then
+                rust.BroadcastChat(BuildOutput(messages.Player.BroadcastAutoMuted, {"{name}", "{punishTime}"}, {player.displayName, punishTime}))
             end
-            if self.Config.Settings.Logging.LogToConsole == "true" then
-                printToConsole("[ChatHandler] "..player.displayName.." got a "..punishTime.." auto mute for spam")
+            if settings.Logging.LogToConsole == "true" then
+                PrintToConsole("[ChatHandler] "..player.displayName.." got a "..punishTime.." auto mute for spam")
             end
-            if self.Config.Settings.Logging.LogToFile == "true" then
-                printToFile(player.displayName.." got a "..punishTime.." auto mute for spam")
+            if settings.Logging.LogToFile == "true" then
+                PrintToFile(player.displayName.." got a "..punishTime.." auto mute for spam")
             end
             return false
         end
@@ -407,21 +415,23 @@ function PLUGIN:OnPlayerChat(arg)
     local canChat, msg, errorMsg, errorPrefix = self:ParseChat(player, msg)
     -- Chat is blocked
     if not canChat then
-        if self.Config.Settings.Logging.LogBlockedMessages == "true" then
-            if self.Config.Settings.Logging.LogToConsole == "true" then
+        if settings.Logging.LogBlockedMessages == "true" then
+            if settings.Logging.LogToConsole == "true" then
                 --global.ServerConsole.PrintColoured(System.ConsoleColor.Cyan, errorPrefix, System.ConsoleColor.DarkYellow, " "..player.displayName..": ", System.ConsoleColor.DarkGreen, msg)
                 UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({errorPrefix.." "..player.displayName..": "..msg}))
             end
-            if self.Config.Settings.Logging.LogToFile == "true" then
-                printToFile(errorPrefix.." "..steamID.."/"..player.displayName..": "..msg.."\n")
+            if settings.Logging.LogToFile == "true" then
+                PrintToFile(errorPrefix.." "..steamID.."/"..player.displayName..": "..msg.."\n")
             end
         end
-        rust.SendChatMessage(player, errorMsg)
+        if errorMsg then
+            rust.SendChatMessage(player, errorMsg)
+        end
         return false
     end
     -- Chat is ok and not blocked
-    local maxCharsPerLine = tonumber(self.Config.Settings.General.MaxCharsPerLine)
-    msg = splitLongMessages(msg, maxCharsPerLine) -- msg is a table now
+    local maxCharsPerLine = tonumber(settings.General.MaxCharsPerLine)
+    msg = SplitLongMessages(msg, maxCharsPerLine) -- msg is a table now
     local i = 1
     while msg[i] do
         local username, message, logUsername, logMessage = self:BuildNameMessage(player, msg[i])
@@ -442,11 +452,11 @@ function PLUGIN:AntiSpamCheck(player)
     if AntiSpam[steamID] then
         local firstMsg = AntiSpam[steamID].timestamp
         local msgCount = AntiSpam[steamID].msgcount
-        if msgCount < self.Config.Settings.AntiSpam.MaxLines then
+        if msgCount < settings.AntiSpam.MaxLines then
             AntiSpam[steamID].msgcount = AntiSpam[steamID].msgcount + 1
             return false, false
         else
-            if now - firstMsg <= self.Config.Settings.AntiSpam.TimeFrame then
+            if now - firstMsg <= settings.AntiSpam.TimeFrame then
                 -- punish
                 local punishCount = 1
                 local expiration, punishTime, newEntry
@@ -498,7 +508,7 @@ function PLUGIN:ParseChat(player, msg)
     local steamID = rust.UserIDFromPlayer(player)
     if AdminMode[steamID] then return true, msg, false, false end
     -- Check for server advertisements
-    if self.Config.Settings.General.BlockServerAds == "true" then
+    if settings.General.BlockServerAds == "true" then
         local ipCheck
         local ipString = ""
         local chunks = {msg:match("(%d+)%.(%d+)%.(%d+)%.(%d+)")}
@@ -520,52 +530,76 @@ function PLUGIN:ParseChat(player, msg)
         end
         if ipCheck then
             local allowedIP = false
-            for key, value in pairs(self.Config.Settings.General.AllowedIPsToPost) do
-                if self.Config.Settings.General.AllowedIPsToPost[key]:match(ipString) then
+            for key, value in pairs(settings.General.AllowedIPsToPost) do
+                if settings.General.AllowedIPsToPost[key]:match(ipString) then
                     allowedIP = true
                 end
             end
             if not allowedIP then
-                return false, msg, self.Config.Messages.PlayerNotifications.AdWarning, "[BLOCKED]"
+                return false, msg, messages.Player.AdWarning, "[BLOCKED]"
             end
         end
     end
     -- Check for blacklisted words
-    if self.Config.Settings.Wordfilter.EnableWordfilter== "true" then
-        for key, value in pairs(self.Config.WordFilter) do
+    if settings.Wordfilter.EnableWordfilter == "true" then
+        for key, value in pairs(wordfilter) do
             local first, last = string.find(msg:lower(), key:lower(), nil, true)
             if first then
-                while first do
-                    local before = msg:sub(1, first - 1)
-                    local after = msg:sub(last + 1)
-                    -- replace whole word if parts are blacklisted
-                    if self.Config.Settings.Wordfilter.ReplaceFullWord == "true" then
-                        if before:sub(-1) ~= " " and before:len() > 0 then
-                            local spaceStart, spaceEnd = string.find(before:reverse(), " ")
-                            if spaceStart then
-                                before = before:sub(spaceStart + 1):reverse()
-                            else
-                                before = ""
-                            end
-                        end
-                        if after:sub(1, 1) ~= " " and after:len() > 0 then
-                            local spaceStart, spaceEnd = after:find(" ")
-                            if spaceStart then
-                                after = after:sub(spaceStart)
-                            else
-                                after = ""
-                            end
+                if type(value) == "table" and settings.Wordfilter.AllowPunish == "true" then
+                    -- kick, ban or mute for word usage
+                    if value[1] == "mute" then
+                        if eChatMute then
+                            eChatMute:Call("APIMute", steamID, 0)
+                            return false, msg, value[2], "[BLOCKED]"
                         end
                     end
-                    msg = before..value..after
-                    first, last = string.find(msg:lower(), key:lower(), nil, true)
+                    if value[1] == "kick" then
+                        Network.Net.sv:Kick(player.net.connection, value[2])
+                        return false, msg, false, "[BLOCKED]"
+                    end
+                else
+                    -- replace words
+                    while first do
+                        local before = msg:sub(1, first - 1)
+                        local after = msg:sub(last + 1)
+                        -- replace whole word if parts are blacklisted
+                        if settings.Wordfilter.ReplaceFullWord == "true" then
+                            if before:sub(-1) ~= " " and before:len() > 0 then
+                                local spaceStart, spaceEnd = before:reverse():find(" ")
+                                if spaceStart then
+                                    before = before:sub(spaceStart + 1):reverse()
+                                else
+                                    before = ""
+                                end
+                            end
+                            if after:sub(1, 1) ~= " " and after:len() > 0 then
+                                local spaceStart, spaceEnd = after:find(" ")
+                                if spaceStart then
+                                    after = after:sub(spaceStart)
+                                else
+                                    after = ""
+                                end
+                            end
+                        end
+                        msg = before..value..after
+                        first, last = msg:lower():find(key:lower(), nil, true)
+                    end
                 end
             end
         end
     end
-    -- show dem sneaky color tags
+    -- Make html tags useless
     msg = msg:gsub("<[cC][oO][lL][oO][rR]", "<\\color\\")
     msg = msg:gsub("[cC][oO][lL][oO][rR]>", "\\color\\>")
+    msg = msg:gsub("<[sS][iI][zZ][eE]", "<\\size\\")
+    msg = msg:gsub("[sS][iI][zZ][eE]>", "\\size\\>")
+    msg = msg:gsub("<[mM][aA][tT][eE][rR][iI][aA][lL]", "<\\material\\")
+    msg = msg:gsub("[mM][aA][tT][eE][rR][iI][aA][lL]>", "\\material\\>")
+    msg = msg:gsub("<[qQ][uU][aA][dD]", "<\\quad\\")
+    msg = msg:gsub("[qQ][uU][aA][dD]>", "\\quad\\>")
+    msg = msg:gsub("<[bB]>", "<\\b\\>")
+    msg = msg:gsub("<[iI]>", "<\\i\\>")
+
     return true, msg, false, false
 end
 -- --------------------------------
@@ -577,32 +611,42 @@ function PLUGIN:BuildNameMessage(player, msg)
     local message, logMessage = msg, msg
     local steamID = rust.UserIDFromPlayer(player)
     if AdminMode[steamID] then
-        username = "<color="..self.Config.Settings.AdminMode.NameColor..">"..self.Config.Settings.AdminMode.ChatName.."</color>"
-        message = "<color="..self.Config.Settings.AdminMode.TextColor..">"..message.."</color>"
-        logUsername = self.Config.Settings.AdminMode.ChatName
+        username = "<color="..settings.AdminMode.NameColor..">"..settings.AdminMode.ChatName.."</color>"
+        message = "<color="..settings.AdminMode.TextColor..">: "..message.."</color>"
+        logUsername = settings.AdminMode.ChatName..":"
         return username, message, logUsername, logMessage
     end
-    if self.Config.Settings.General.EnableChatGroups == "true" then
+    if settings.General.EnableChatGroups == "true" then
         local priorityRank = 0
-        for key, _ in pairs(self.Config.ChatGroups) do
-            if permission.UserHasPermission(steamID, self.Config.ChatGroups[key].Permission) then
-                if self.Config.ChatGroups[key].ShowPrefix then
-                    if self.Config.ChatGroups[key].PrefixPosition == "left" then
-                        username = "<color="..self.Config.ChatGroups[key].PrefixColor..">"..self.Config.ChatGroups[key].Prefix.."</color> <color="..self.Config.ChatGroups[key].NameColor..">"..username.."</color>"
-                        logUsername = self.Config.ChatGroups[key].Prefix.." "..logUsername
+        local msgcolor, namecolor = "", ""
+        for key, _ in pairs(chatgroups) do
+            if permission.UserHasPermission(steamID, chatgroups[key].Permission) then
+                if chatgroups[key].ShowPrefix then
+                    if chatgroups[key].PrefixPosition == "left" then
+                        username = "<color="..chatgroups[key].PrefixColor..">"..chatgroups[key].Prefix.."</color> "..username
+                        logUsername = chatgroups[key].Prefix.." "..logUsername
                     else
-                        username = "<color="..self.Config.ChatGroups[key].NameColor..">"..username.."</color> <color="..self.Config.ChatGroups[key].PrefixColor..">"..self.Config.ChatGroups[key].Prefix.."</color>"
-                        logUsername = logUsername.." "..self.Config.ChatGroups[key].Prefix
+                        username = username.." <color="..chatgroups[key].PrefixColor..">"..chatgroups[key].Prefix.."</color>"
+                        logUsername = logUsername.." "..chatgroups[key].Prefix
                     end
-                else
-                    username = "<color="..self.Config.ChatGroups[key].NameColor..">"..username.."</color>"
                 end
-                if self.Config.ChatGroups[key].PriorityRank > priorityRank then
-                    priorityRank = self.Config.ChatGroups[key].PriorityRank
-                    message = "<color="..self.Config.ChatGroups[key].TextColor..">"..msg.."</color>"
+                if chatgroups[key].PriorityRank > priorityRank then
+                    msgcolor = chatgroups[key].TextColor
+                    namecolor = chatgroups[key].NameColor
+                    priorityRank = chatgroups[key].PriorityRank
                 end
             end
         end
+        -- insert colors for name and message
+        local first, last = username:find(player.displayName, 1, true)
+        username = username:sub(1, first - 1).."<color="..namecolor..">"..player.displayName.."</color>"..username:sub(last + 1)
+        message = "<color="..msgcolor..">: "..msg.."</color>"
+    else
+        -- Use default Rust name colors
+        local namecolor = "#5af"
+        if player:IsAdmin() then namecolor = "#af5" end
+        if player:IsDeveloper() then namecolor = "#fa5" end
+        username = "<color="..namecolor..">"..username.."</color>"
     end
     -- Add title if plugin RanksAndTitles is installed
     if eRanksAndTitles then
@@ -637,9 +681,9 @@ function PLUGIN:SendChat(player, name, msg, logName, logMsg)
     --global.ServerConsole.PrintColoured(System.ConsoleColor.DarkYellow, logName..": ", System.ConsoleColor.DarkGreen, logMsg)
     UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({"[CHAT] "..logName..": "..logMsg}))
     -- Log chat to log file
-    global.server.Log("Log.Chat.txt", steamID.."/"..logName..": "..logMsg.."\n")
+    ConVar.Server.Log("Log.Chat.txt", steamID.."/"..logName..": "..logMsg.."\n")
     -- Log chat history
-    if self.Config.Settings.General.EnableChatHistory == "true" then
+    if settings.General.EnableChatHistory == "true" then
         self:InsertHistory(name, steamID, msg)
     end
 end
@@ -664,14 +708,14 @@ function PLUGIN:cmdHistory(player)
         end
         rust.SendChatMessage(player, "ChatHistory", "----------")
     else
-        rust.SendChatMessage(player, "ChatHistory", self.Config.Messages.PlayerNotifications.NoChatHistory)
+        rust.SendChatMessage(player, "ChatHistory", messages.Player.NoChatHistory)
     end
 end
 -- --------------------------------
 -- inserts chat messages into history
 -- --------------------------------
 function PLUGIN:InsertHistory(name, steamID, msg)
-    if #ChatHistory == self.Config.Settings.General.ChatHistoryMaxLines then
+    if #ChatHistory == settings.General.ChatHistoryMaxLines then
         table.remove(ChatHistory, 1)
     end
     table.insert(ChatHistory, {["name"] = name, ["steamID"] = steamID, ["msg"] = msg})
@@ -683,15 +727,15 @@ function PLUGIN:cmdEditWordFilter(player, cmd, args)
     local args = self:ArgsToTable(args, "chat")
     local func, word, replacement = args[1], args[2], args[3]
     if not func or func ~= "add" and func ~= "remove" and func ~= "list" then
-        if not HasPermission(player, self.Config.Settings.Permissions.EditWordFilter) then
+        if not HasPermission(player, settings.Permissions.EditWordFilter) then
             rust.SendChatMessage(player, "Syntax /wordfilter list")
         else
             rust.SendChatMessage(player, "Syntax: /wordfilter add <word> <replacement> or /wordfilter remove <word>")
         end
         return
     end
-    if func ~= "list" and not HasPermission(player, self.Config.Settings.Permissions.EditWordFilter) then
-        rust.SendChatMessage(player, self.Config.Messages.AdminNotifications.NoPermission)
+    if func ~= "list" and not HasPermission(player, settings.Permissions.EditWordFilter) then
+        rust.SendChatMessage(player, messages.Admin.NoPermission)
         return
     end
     if func == "add" then
@@ -701,12 +745,12 @@ function PLUGIN:cmdEditWordFilter(player, cmd, args)
         end
         local first, last = string.find(replacement:lower(), word:lower())
         if first then
-            rust.SendChatMessage(player, buildOutput(self.Config.Messages.AdminNotifications.WordfilterError, {"{replacement}", "{word}"}, {replacement, word}))
+            rust.SendChatMessage(player, BuildOutput(messages.Admin.WordfilterError, {"{replacement}", "{word}"}, {replacement, word}))
             return
         else
-            self.Config.WordFilter[word] = replacement
+            wordfilter[word] = replacement
             self:SaveConfig()
-            rust.SendChatMessage(player, buildOutput(self.Config.Messages.AdminNotifications.WordfilterAdded, {"{word}", "{replacement}"}, {word, replacement}))
+            rust.SendChatMessage(player, BuildOutput(messages.Admin.WordfilterAdded, {"{word}", "{replacement}"}, {word, replacement}))
         end
         return
     end
@@ -715,32 +759,32 @@ function PLUGIN:cmdEditWordFilter(player, cmd, args)
             rust.SendChatMessage(player, "Syntax: /wordfilter remove <word>")
             return
         end
-        if self.Config.WordFilter[word] then
-            self.Config.WordFilter[word] = nil
+        if wordfilter[word] then
+            wordfilter[word] = nil
             self:SaveConfig()
-            rust.SendChatMessage(player, buildOutput(self.Config.Messages.AdminNotifications.WordfilterRemoved, {"{word}"}, {word}))
+            rust.SendChatMessage(player, BuildOutput(messages.Admin.WordfilterRemoved, {"{word}"}, {word}))
         else
-            rust.SendChatMessage(player, buildOutput(self.Config.Messages.AdminNotifications.WordfilterNotFound, {"{word}"}, {word}))
+            rust.SendChatMessage(player, BuildOutput(messages.Admin.WordfilterNotFound, {"{word}"}, {word}))
         end
         return
     end
     if func == "list" then
         local wordFilterList = ""
-        for key, _ in pairs(self.Config.WordFilter) do
+        for key, _ in pairs(wordfilter) do
             wordFilterList = wordFilterList..key..", "
         end
-        rust.SendChatMessage(player, buildOutput(self.Config.Messages.PlayerNotifications.WordfilterList, {"{wordFilterList}"}, {wordFilterList}))
+        rust.SendChatMessage(player, BuildOutput(messages.Player.WordfilterList, {"{wordFilterList}"}, {wordFilterList}))
     end
 end
 -- --------------------------------
 -- handles chat command /help
 -- --------------------------------
 function PLUGIN:SendHelpText(player)
-    if self.Config.Settings.General.EnableChatHistory == "true" then
-        rust.SendChatMessage(player, self.Config.Messages.Helptext.ChatHistory)
+    if settings.General.EnableChatHistory == "true" then
+        rust.SendChatMessage(player, messages.Helptext.ChatHistory)
     end
-    if self.Config.Settings.Wordfilter.EnableWordfilter == "true" then
-        rust.SendChatMessage(player, self.Config.Messages.Helptext.Wordfilter)
+    if settings.Wordfilter.EnableWordfilter == "true" then
+        rust.SendChatMessage(player, messages.Helptext.Wordfilter)
     end
 end
 
