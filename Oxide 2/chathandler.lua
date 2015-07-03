@@ -14,7 +14,7 @@ local SpamList = "chathandler-spamlist"
 local LogFile = "Log.ChatHandler.txt"
 local AntiSpam, ChatHistory, AdminMode = {}, {}, {}
 -- external plugin references
-local eRanksAndTitles, eIgnoreAPI, eChatMute
+local eRanksAndTitles, eIgnoreAPI, eChatMute, eOverthrone
 -- --------------------------------
 -- initialise all settings and data
 -- --------------------------------
@@ -28,6 +28,7 @@ function PLUGIN:OnServerInitialized()
     eRanksAndTitles = plugins.Find("RanksAndTitles") or false
     eChatMute = plugins.Find("chatmute") or false
     eIgnoreAPI = plugins.Find("0ignoreAPI") or false
+    eOverthrone = plugins.Find("overthrone") or false
 end
 -- --------------------------------
 -- Debug reporting
@@ -122,8 +123,8 @@ function PLUGIN:LoadDefaultConfig()
     settings.ChatCommands.Wordfilter        = settings.ChatCommands.Wordfilter or {"wordfilter"}
     -- command permissions
     settings.Permissions                    = settings.Permissions or {}
-    settings.Permissions.AdminMode          = settings.Permissions.AdminMode or "canadminmode"
-    settings.Permissions.EditWordFilter     = settings.Permissions.EditWordFilter or "caneditwordfilter"
+    settings.Permissions.AdminMode          = settings.Permissions.AdminMode or "chathandler.adminmode"
+    settings.Permissions.EditWordFilter     = settings.Permissions.EditWordFilter or "chathandler.wordfilter"
     -- Logging settings
     settings.Logging                        = settings.Logging or {}
     settings.Logging.LogToConsole           = settings.Logging.LogToConsole or "true"
@@ -200,7 +201,8 @@ function PLUGIN:LoadDefaultConfig()
         ["bitch"] = "sweety",
         ["fucking hell"] = "lovely heaven",
         ["cunt"] = "****",
-        ["hurensohn"] = {"mute", "muted for hurensohn"}
+        ["nigger"] = {"mute", "mute reason"},
+        ["son of a bitch"] = {"kick", "kick reason"}
     }
     wordfilter = self.Config.WordFilter
     -- Check wordfilter for conflicts
@@ -547,13 +549,13 @@ function PLUGIN:ParseChat(player, msg)
             if first then
                 if type(value) == "table" and settings.Wordfilter.AllowPunish == "true" then
                     -- kick, ban or mute for word usage
-                    if value[1] == "mute" then
+                    if value[1]:lower() == "mute" then
                         if eChatMute then
                             eChatMute:Call("APIMute", steamID, 0)
                             return false, msg, value[2], "[BLOCKED]"
                         end
                     end
-                    if value[1] == "kick" then
+                    if value[1]:lower() == "kick" then
                         Network.Net.sv:Kick(player.net.connection, value[2])
                         return false, msg, false, "[BLOCKED]"
                     end
@@ -597,8 +599,10 @@ function PLUGIN:ParseChat(player, msg)
     msg = msg:gsub("[mM][aA][tT][eE][rR][iI][aA][lL]>", "\\material\\>")
     msg = msg:gsub("<[qQ][uU][aA][dD]", "<\\quad\\")
     msg = msg:gsub("[qQ][uU][aA][dD]>", "\\quad\\>")
-    msg = msg:gsub("<[bB]>", "<\\b\\>")
-    msg = msg:gsub("<[iI]>", "<\\i\\>")
+    msg = msg:gsub("<[bB]", "<\\b\\")
+    msg = msg:gsub("[bB]>", "\\b\\>")
+    msg = msg:gsub("<[iI]", "<\\i\\")
+    msg = msg:gsub("[iI]>", "\\i\\>")
 
     return true, msg, false, false
 end
@@ -647,6 +651,7 @@ function PLUGIN:BuildNameMessage(player, msg)
         if player:IsAdmin() then namecolor = "#af5" end
         if player:IsDeveloper() then namecolor = "#fa5" end
         username = "<color="..namecolor..">"..username.."</color>"
+        message = ": "..msg
     end
     -- Add title if plugin RanksAndTitles is installed
     if eRanksAndTitles then
@@ -668,6 +673,15 @@ function PLUGIN:BuildNameMessage(player, msg)
             end
         end
     end
+    -- Handle overthrone messages
+    --[[
+    if eOverthrone then
+        local prefix = eOverthrone:Call("getKingData", "SETTINGS", "KING PREFIX")
+        local textColor = eOverthrone:Call("getKingData", "COLORS", "KING CHAT")
+        username = prefix.." "..username
+        message = "<color="..textColor..">: "..msg.."</color>"
+    end
+    ]]
     return username, message, logUsername, logMessage
 end
 -- --------------------------------
