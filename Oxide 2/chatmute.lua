@@ -1,8 +1,8 @@
 PLUGIN.Title        = "ChatMute"
 PLUGIN.Description  = "Helps moderating chat by muting players"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(1, 0, 0)
-PLUGIN.ResourceId   = _
+PLUGIN.Version      = V(1, 1, 0)
+PLUGIN.ResourceId   = 1053
 
 local debugMode = false
 
@@ -15,49 +15,52 @@ end
 -- --------------------------------
 -- generates default config
 -- --------------------------------
+local settings, messages
 function PLUGIN:LoadDefaultConfig()
-    self.Config.Settings                                = self.Config.Settings or {}
+    self.Config.Settings                    = self.Config.Settings or {}
+    settings = self.Config.Settings
     -- General Settings
-    self.Config.Settings.General                        = self.Config.Settings.General or {}
-    self.Config.Settings.General.BroadcastMutes         = self.Config.Settings.General.BroadcastMutes or "true"
-    self.Config.Settings.General.LogToConsole           = self.Config.Settings.General.LogToConsole or "true"
+    settings.General                        = settings.General or {}
+    settings.General.BroadcastMutes         = settings.General.BroadcastMutes or "true"
+    settings.General.LogToConsole           = settings.General.LogToConsole or "true"
     -- Chat commands
-    self.Config.Settings.ChatCommands                   = self.Config.Settings.ChatCommands or {}
-    self.Config.Settings.ChatCommands.Mute              = self.Config.Settings.ChatCommands.Mute or {"mute"}
-    self.Config.Settings.ChatCommands.Unmute            = self.Config.Settings.ChatCommands.Unmute or {"unmute"}
-    self.Config.Settings.ChatCommands.GlobalMute        = self.Config.Settings.ChatCommands.GlobalMute or {"globalmute"}
+    settings.ChatCommands                   = settings.ChatCommands or {}
+    settings.ChatCommands.Mute              = settings.ChatCommands.Mute or {"mute"}
+    settings.ChatCommands.Unmute            = settings.ChatCommands.Unmute or {"unmute"}
+    settings.ChatCommands.GlobalMute        = settings.ChatCommands.GlobalMute or {"globalmute"}
     -- command permissions
-    self.Config.Settings.Permissions                    = self.Config.Settings.Permissions or {}
-    self.Config.Settings.Permissions.Mute               = self.Config.Settings.Permissions.Mute or "canmute"
-    self.Config.Settings.Permissions.GlobalMute         = self.Config.Settings.Permissions.GlobalMute or "canglobalmute"
-    self.Config.Settings.Permissions.AntiGlobalMute     = self.Config.Settings.Permissions.AntiGlobalMute or "notglobalmuted"
+    settings.Permissions                    = settings.Permissions or {}
+    settings.Permissions.Mute               = settings.Permissions.Mute or "chat.mute"
+    settings.Permissions.GlobalMute         = settings.Permissions.GlobalMute or "chat.globalmute"
+    settings.Permissions.AntiGlobalMute     = settings.Permissions.AntiGlobalMute or "chat.notglobalmuted"
     -- Messages
-    self.Config.Messages                                = self.Config.Messages or {}
+    self.Config.Messages                    = self.Config.Messages or {}
+    messages = self.Config.Messages
     -- admin messages
-    self.Config.Messages.Admin                          = self.Config.Messages.Admin or {}
-    self.Config.Messages.Admin.NoPermission             = self.Config.Messages.Admin.NoPermission or "You dont have permission to use this command"
-    self.Config.Messages.Admin.PlayerNotFound           = self.Config.Messages.Admin.PlayerNotFound or "Player not found"
-    self.Config.Messages.Admin.MultiplePlayerFound      = self.Config.Messages.Admin.MultiplePlayerFound or "Found more than one player, be more specific:"
-    self.Config.Messages.Admin.AlreadyMuted             = self.Config.Messages.Admin.AlreadyMuted or "{name} is already muted"
-    self.Config.Messages.Admin.PlayerMuted              = self.Config.Messages.Admin.PlayerMuted or "{name} has been muted"
-    self.Config.Messages.Admin.InvalidTimeFormat        = self.Config.Messages.Admin.InvalidTimeFormat or "Invalid time format"
-    self.Config.Messages.Admin.PlayerMutedTimed         = self.Config.Messages.Admin.PlayerMutedTimed or "{name} has been muted for {time}"
-    self.Config.Messages.Admin.MutelistCleared          = self.Config.Messages.Admin.MutelistCleared or "Cleared {count} entries from mutelist"
-    self.Config.Messages.Admin.PlayerUnmuted            = self.Config.Messages.Admin.PlayerUnmuted or "{name} has been unmuted"
-    self.Config.Messages.Admin.PlayerNotMuted           = self.Config.Messages.Admin.PlayerNotMuted or "{name} is not muted"
+    messages.Admin                          = messages.Admin or {}
+    messages.Admin.NoPermission             = messages.Admin.NoPermission or "You dont have permission to use this command"
+    messages.Admin.PlayerNotFound           = messages.Admin.PlayerNotFound or "Player not found"
+    messages.Admin.MultiplePlayerFound      = messages.Admin.MultiplePlayerFound or "Found more than one player, be more specific:"
+    messages.Admin.AlreadyMuted             = messages.Admin.AlreadyMuted or "{name} is already muted"
+    messages.Admin.PlayerMuted              = messages.Admin.PlayerMuted or "{name} has been muted"
+    messages.Admin.InvalidTimeFormat        = messages.Admin.InvalidTimeFormat or "Invalid time format"
+    messages.Admin.PlayerMutedTimed         = messages.Admin.PlayerMutedTimed or "{name} has been muted for {time}"
+    messages.Admin.MutelistCleared          = messages.Admin.MutelistCleared or "Cleared {count} entries from mutelist"
+    messages.Admin.PlayerUnmuted            = messages.Admin.PlayerUnmuted or "{name} has been unmuted"
+    messages.Admin.PlayerNotMuted           = messages.Admin.PlayerNotMuted or "{name} is not muted"
     -- player messages
-    self.Config.Messages.Player                         = self.Config.Messages.Player or {}
-    self.Config.Messages.Player.GlobalMuteEnabled       = self.Config.Messages.Player.GlobalMuteEnabled or "Chat is now globally muted"
-    self.Config.Messages.Player.GlobalMuteDisabled      = self.Config.Messages.Player.GlobalMuteDisabled or "Global chat mute disabled"
-    self.Config.Messages.Player.BroadcastMutes          = self.Config.Messages.Player.BroadcastMutes or "{name} has been muted"
-    self.Config.Messages.Player.Muted                   = self.Config.Messages.Player.Muted or "You have been muted"
-    self.Config.Messages.Player.BroadcastMutesTimed     = self.Config.Messages.Player.BroadcastMutesTimed or "{name} has been muted for {time}"
-    self.Config.Messages.Player.MutedTimed              = self.Config.Messages.Player.MutedTimed or "You have been muted for {time}"
-    self.Config.Messages.Player.BroadcastUnmutes        = self.Config.Messages.Player.BroadcastUnmutes or "{name} has been unmuted"
-    self.Config.Messages.Player.Unmuted                 = self.Config.Messages.Player.Unmuted or "You have been unmuted"
-    self.Config.Messages.Player.IsMuted                 = self.Config.Messages.Player.IsMuted or "You are muted"
-    self.Config.Messages.Player.IsTimeMuted             = self.Config.Messages.Player.IsTimeMuted or "You are muted for {timeMuted}"
-    self.Config.Messages.Player.GlobalMuted             = self.Config.Messages.Player.GlobalMuted or "Chat is globally muted by an admin"
+    messages.Player                         = messages.Player or {}
+    messages.Player.GlobalMuteEnabled       = messages.Player.GlobalMuteEnabled or "Chat is now globally muted"
+    messages.Player.GlobalMuteDisabled      = messages.Player.GlobalMuteDisabled or "Global chat mute disabled"
+    messages.Player.BroadcastMutes          = messages.Player.BroadcastMutes or "{name} has been muted"
+    messages.Player.Muted                   = messages.Player.Muted or "You have been muted"
+    messages.Player.BroadcastMutesTimed     = messages.Player.BroadcastMutesTimed or "{name} has been muted for {time}"
+    messages.Player.MutedTimed              = messages.Player.MutedTimed or "You have been muted for {time}"
+    messages.Player.BroadcastUnmutes        = messages.Player.BroadcastUnmutes or "{name} has been unmuted"
+    messages.Player.Unmuted                 = messages.Player.Unmuted or "You have been unmuted"
+    messages.Player.IsMuted                 = messages.Player.IsMuted or "You are muted"
+    messages.Player.IsTimeMuted             = messages.Player.IsTimeMuted or "You are muted for {timeMuted}"
+    messages.Player.GlobalMuted             = messages.Player.GlobalMuted or "Chat is globally muted by an admin"
 
     self:SaveConfig()
 end
@@ -94,18 +97,19 @@ end
 -- load all commands, depending on settings
 -- --------------------------------
 function PLUGIN:LoadCommands()
-    for _, cmd in pairs(self.Config.Settings.ChatCommands.Mute) do
+    for _, cmd in pairs(settings.ChatCommands.Mute) do
         command.AddChatCommand(cmd, self.Object, "cmdMute")
     end
-    for _, cmd in pairs(self.Config.Settings.ChatCommands.Unmute) do
+    for _, cmd in pairs(settings.ChatCommands.Unmute) do
         command.AddChatCommand(cmd, self.Object, "cmdUnMute")
     end
-    for _, cmd in pairs(self.Config.Settings.ChatCommands.GlobalMute) do
+    for _, cmd in pairs(settings.ChatCommands.GlobalMute) do
         command.AddChatCommand(cmd, self.Object, "cmdGlobalMute")
     end
     -- Console commands
     command.AddConsoleCommand("player.mute", self.Object, "ccmdMute")
     command.AddConsoleCommand("player.unmute", self.Object, "ccmdUnMute")
+    command.AddConsoleCommand("chatmute.debug", self.Object, "ccmdDebug")
 end
 -- --------------------------------
 -- permission check
@@ -123,16 +127,16 @@ end
 -- --------------------------------
 -- builds output messages by replacing wildcards
 -- --------------------------------
-local function buildOutput(str, tags, replacements)
+local function BuildOutput(str, tags, replacements)
     for i = 1, #tags do
-        str = string.gsub(str, tags[i], replacements[i])
+        str = str:gsub(tags[i], replacements[i])
     end
     return str
 end
 -- --------------------------------
 -- prints to server console
 -- --------------------------------
-local function printToConsole(msg)
+local function PrintToConsole(msg)
     --global.ServerConsole.PrintColoured(System.ConsoleColor.Cyan, msg)
     UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({msg}))
 end
@@ -140,7 +144,7 @@ end
 -- register all permissions for group system
 -- --------------------------------
 function PLUGIN:RegisterPermissions()
-    for _, perm in pairs(self.Config.Settings.Permissions) do
+    for _, perm in pairs(settings.Permissions) do
         if not permission.PermissionExists(perm) then
             permission.RegisterPermission(perm, self.Object)
         end
@@ -161,7 +165,7 @@ local function FindPlayer(NameOrIpOrSteamID, checkSleeper)
             table.insert(playerTbl, currPlayer)
             return #playerTbl, playerTbl
         end
-        local matched, _ = string.find(currPlayer.displayName:lower(), NameOrIpOrSteamID:lower(), 1, true)
+        local matched, _ = currPlayer.displayName:lower():find(NameOrIpOrSteamID:lower(), 1, true)
         if matched then
             table.insert(playerTbl, currPlayer)
         end
@@ -175,7 +179,7 @@ local function FindPlayer(NameOrIpOrSteamID, checkSleeper)
                 table.insert(playerTbl, currPlayer)
                 return #playerTbl, playerTbl
             end
-            local matched, _ = string.find(currPlayer.displayName:lower(), NameOrIpOrSteamID:lower(), 1, true)
+            local matched, _ = currPlayer.displayName:lower():find(NameOrIpOrSteamID:lower(), 1, true)
             if matched then
                 table.insert(playerTbl, currPlayer)
             end
@@ -194,7 +198,7 @@ end
 function PLUGIN:IsMuted(player)
     local now = time.GetUnixTimestamp()
     local targetSteamID = rust.UserIDFromPlayer(player)
-    if GlobalMute and not HasPermission(player, self.Config.Settings.Permissions.AntiGlobalMute) then
+    if GlobalMute and not HasPermission(player, settings.Permissions.AntiGlobalMute) then
         return true
     end
     if not muteData[targetSteamID] then
@@ -222,30 +226,48 @@ function PLUGIN:APIMute(steamID, expiration)
     muteData[steamID].expiration = expiration
     table.insert(muteData, muteData[steamID])
     datafile.SaveDataTable(muteList)
+    local numFound, targetPlayerTbl = FindPlayer(steamID, false)
+    targetPlayerTbl[1]:SetPlayerFlag(global.BasePlayer.PlayerFlags.VoiceMuted, true)
     return true
 end
 -- --------------------------------
 -- handles chat command /globalmute
 -- --------------------------------
 function PLUGIN:cmdGlobalMute(player)
-    if not HasPermission(player, self.Config.Settings.Permissions.GlobalMute) then
-        rust.SendChatMessage(player, self.Config.Messages.Admin.NoPermission)
+    if not HasPermission(player, settings.Permissions.GlobalMute) then
+        rust.SendChatMessage(player, messages.Admin.NoPermission)
         return
     end
     if not GlobalMute then
         GlobalMute = true
-        rust.BroadcastChat(self.Config.Messages.Player.GlobalMuteEnabled)
+        rust.BroadcastChat(messages.Player.GlobalMuteEnabled)
     else
         GlobalMute = false
-        rust.BroadcastChat(self.Config.Messages.Player.GlobalMuteDisabled)
+        rust.BroadcastChat(messages.Player.GlobalMuteDisabled)
+    end
+end
+-- --------------------------------
+-- activate/deactivate debug mode
+-- --------------------------------
+function PLUGIN:ccmdDebug(arg)
+    if arg.connection then return end -- terminate if not server console
+    local args = self:ArgsToTable(arg, "console")
+    if args[1] == "true" then
+        debugMode = true
+        PrintToConsole("[ChatMute]: debug mode activated")
+    elseif args[1] == "false" then
+        debugMode = false
+        PrintToConsole("[ChatMute]: debug mode deactivated")
+    else
+        PrintToConsole("Syntax: chatmute.debug true/false")
     end
 end
 -- --------------------------------
 -- handles chat command /mute
 -- --------------------------------
 function PLUGIN:cmdMute(player, cmd, args)
-    if not HasPermission(player, self.Config.Settings.Permissions.Mute) then
-        rust.SendChatMessage(player, self.Config.Messages.Admin.NoPermission)
+    if not HasPermission(player, settings.Permissions.Mute) then
+        rust.SendChatMessage(player, messages.Admin.NoPermission)
         return
     end
     local args = self:ArgsToTable(args, "chat")
@@ -256,7 +278,7 @@ function PLUGIN:cmdMute(player, cmd, args)
     end
     local numFound, targetPlayerTbl = FindPlayer(target, false)
     if numFound == 0 then
-        rust.SendChatMessage(player, self.Config.Messages.Admin.PlayerNotFound)
+        rust.SendChatMessage(player, messages.Admin.PlayerNotFound)
         return
     end
     if numFound > 1 then
@@ -264,7 +286,7 @@ function PLUGIN:cmdMute(player, cmd, args)
         for i = 1, numFound do
             targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
         end
-        rust.SendChatMessage(player, self.Config.Messages.Admin.MultiplePlayerFound)
+        rust.SendChatMessage(player, messages.Admin.MultiplePlayerFound)
         rust.SendChatMessage(player, targetNameString)
         return
     end
@@ -280,8 +302,8 @@ function PLUGIN:ccmdMute(arg)
         player = arg.connection.player
     end
     if player then F1Console = true end
-    if player and not HasPermission(player, self.Config.Settings.Permissions.Mute) then
-        arg:ReplyWith(self.Config.Messages.Admin.NoPermission)
+    if player and not HasPermission(player, settings.Permissions.Mute) then
+        arg:ReplyWith(messages.Admin.NoPermission)
         return true
     end
     local args = self:ArgsToTable(arg, "console")
@@ -290,16 +312,16 @@ function PLUGIN:ccmdMute(arg)
         if F1Console then
             arg:ReplyWith("Syntax: player.mute <name/steamID> <time[m/h] (optional)>")
         else
-            printToConsole("Syntax: player.mute <name/steamID> <time[m/h] (optional)>")
+            PrintToConsole("Syntax: player.mute <name/steamID> <time[m/h] (optional)>")
         end
         return
     end
     local numFound, targetPlayerTbl = FindPlayer(target, false)
     if numFound == 0 then
         if F1Console then
-            arg:ReplyWith(self.Config.Messages.Admin.PlayerNotFound)
+            arg:ReplyWith(messages.Admin.PlayerNotFound)
         else
-            printToConsole(self.Config.Messages.Admin.PlayerNotFound)
+            PrintToConsole(messages.Admin.PlayerNotFound)
         end
         return
     end
@@ -309,14 +331,14 @@ function PLUGIN:ccmdMute(arg)
             targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
         end
         if F1Console then
-            arg:ReplyWith(self.Config.Messages.Admin.MultiplePlayerFound)
+            arg:ReplyWith(messages.Admin.MultiplePlayerFound)
             for i = 1, numFound do
                 arg:ReplyWith(targetPlayerTbl[i].displayName)
             end
         else
-            printToConsole(self.Config.Messages.Admin.MultiplePlayerFound)
+            PrintToConsole(messages.Admin.MultiplePlayerFound)
             for i = 1, numFound do
-                printToConsole(targetPlayerTbl[i].displayName)
+                PrintToConsole(targetPlayerTbl[i].displayName)
             end
         end
         return
@@ -339,13 +361,13 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
     local isMuted = self:IsMuted(targetPlayer)
     if isMuted then
         if F1Console then
-            arg:ReplyWith(buildOutput(self.Config.Messages.Admin.AlreadyMuted, {"{name}"}, {targetName}))
+            arg:ReplyWith(BuildOutput(messages.Admin.AlreadyMuted, {"{name}"}, {targetName}))
         end
         if srvConsole then
-            printToConsole(buildOutput(self.Config.Messages.Admin.AlreadyMuted, {"{name}"}, {targetName}))
+            PrintToConsole(BuildOutput(messages.Admin.AlreadyMuted, {"{name}"}, {targetName}))
         end
         if chatCmd then
-            rust.SendChatMessage(player, buildOutput(self.Config.Messages.Admin.AlreadyMuted, {"{name}"}, {targetName}))
+            rust.SendChatMessage(player, BuildOutput(messages.Admin.AlreadyMuted, {"{name}"}, {targetName}))
         end
         return
     end
@@ -356,33 +378,34 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
         muteData[targetSteamID].expiration = 0
         table.insert(muteData, muteData[targetSteamID])
         datafile.SaveDataTable(muteList)
+        targetPlayer:SetPlayerFlag(global.BasePlayer.PlayerFlags.VoiceMuted, true)
         -- Send mute notice
-        if self.Config.Settings.General.BroadcastMutes == "true" then
-            rust.BroadcastChat(buildOutput(self.Config.Messages.Player.BroadcastMutes, {"{name}"}, {targetName}))
+        if settings.General.BroadcastMutes == "true" then
+            rust.BroadcastChat(BuildOutput(messages.Player.BroadcastMutes, {"{name}"}, {targetName}))
             if F1Console then
-                arg:ReplyWith(buildOutput(self.Config.Messages.Admin.PlayerMuted, {"{name}"}, {targetName}))
+                arg:ReplyWith(BuildOutput(messages.Admin.PlayerMuted, {"{name}"}, {targetName}))
             end
             if srvConsole then
-                printToConsole(buildOutput(self.Config.Messages.Admin.PlayerMuted, {"{name}"}, {targetName}))
+                PrintToConsole(BuildOutput(messages.Admin.PlayerMuted, {"{name}"}, {targetName}))
             end
         else
             if F1Console then
-                arg:ReplyWith(buildOutput(self.Config.Messages.Admin.PlayerMuted, {"{name}"}, {targetName}))
+                arg:ReplyWith(BuildOutput(messages.Admin.PlayerMuted, {"{name}"}, {targetName}))
             end
             if srvConsole then
-                printToConsole(buildOutput(lself.Config.Messages.Admin.PlayerMuted, {"{name}"}, {targetName}))
+                PrintToConsole(BuildOutput(lmessages.Admin.PlayerMuted, {"{name}"}, {targetName}))
             end
             if chatCmd then
-                rust.SendChatMessage(player, buildOutput(self.Config.Messages.Admin.PlayerMuted, {"{name}"}, {targetName}))
+                rust.SendChatMessage(player, BuildOutput(messages.Admin.PlayerMuted, {"{name}"}, {targetName}))
             end
-            rust.SendChatMessage(targetPlayer, self.Config.Messages.Player.Muted)
+            rust.SendChatMessage(targetPlayer, messages.Player.Muted)
         end
         -- Send console log
-        if self.Config.Settings.General.LogToConsole == "true" then
+        if settings.General.LogToConsole == "true" then
             if not player then
-                printToConsole("[ChatMute] An admin muted "..targetName)
+                PrintToConsole("[ChatMute] An admin muted "..targetName)
             else
-                printToConsole("[ChatMute] "..player.displayName.." muted "..targetName)
+                PrintToConsole("[ChatMute] "..player.displayName.." muted "..targetName)
             end
         end
         return
@@ -392,13 +415,13 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
     local c = string.match(duration, "^%d*[mh]$")
     if string.len(duration) < 2 or not c then
         if F1Console then
-            arg:ReplyWith(self.Config.Messages.Admin.InvalidTimeFormat)
+            arg:ReplyWith(messages.Admin.InvalidTimeFormat)
         end
         if srvConsole then
-            printToConsole(self.Config.Messages.Admin.InvalidTimeFormat)
+            PrintToConsole(messages.Admin.InvalidTimeFormat)
         end
         if chatCmd then
-            rust.SendChatMessage(player, self.Config.Messages.Admin.InvalidTimeFormat)
+            rust.SendChatMessage(player, messages.Admin.InvalidTimeFormat)
         end
         return
     end
@@ -423,33 +446,34 @@ function PLUGIN:Mute(player, targetPlayer, duration, arg)
     muteData[targetSteamID].expiration = expiration
     table.insert(muteData, muteData[targetSteamID])
     datafile.SaveDataTable(muteList)
+    targetPlayer:SetPlayerFlag(global.BasePlayer.PlayerFlags.VoiceMuted, true)
     -- Send mute notice
-    if self.Config.Settings.General.BroadcastMutes == "true" then
-        rust.BroadcastChat(buildOutput(self.Config.Messages.Player.BroadcastMutesTimed, {"{name}", "{time}"}, {targetName, time}))
+    if settings.General.BroadcastMutes == "true" then
+        rust.BroadcastChat(BuildOutput(messages.Player.BroadcastMutesTimed, {"{name}", "{time}"}, {targetName, time}))
         if F1Console then
-            arg:ReplyWith(buildOutput(self.Config.Messages.Admin.PlayerMutedTimed, {"{name}", "{time}"}, {targetName, time}))
+            arg:ReplyWith(BuildOutput(messages.Admin.PlayerMutedTimed, {"{name}", "{time}"}, {targetName, time}))
         end
         if srvConsole then
-            printToConsole(buildOutput(self.Config.Messages.Admin.PlayerMutedTimed, {"{name}", "{time}"}, {targetName, time}))
+            PrintToConsole(BuildOutput(messages.Admin.PlayerMutedTimed, {"{name}", "{time}"}, {targetName, time}))
         end
     else
-        rust.SendChatMessage(targetPlayer, buildOutput(self.Config.Messages.Player.MutedTimed, {"{time}"}, {time}))
+        rust.SendChatMessage(targetPlayer, BuildOutput(messages.Player.MutedTimed, {"{time}"}, {time}))
         if F1Console then
-            arg:ReplyWith(buildOutput(self.Config.Messages.Admin.PlayerMutedTimed, {"{name}", "{time}"}, {targetName, time}))
+            arg:ReplyWith(BuildOutput(messages.Admin.PlayerMutedTimed, {"{name}", "{time}"}, {targetName, time}))
         end
         if srvConsole then
-            printToConsole(buildOutput(self.Config.Messages.Admin.PlayerMutedTimed, {"{name}", "{time}"}, {targetName, time}))
+            PrintToConsole(BuildOutput(messages.Admin.PlayerMutedTimed, {"{name}", "{time}"}, {targetName, time}))
         end
         if chatCmd then
-            rust.SendChatMessage(player, buildOutput(self.Config.Messages.Admin.PlayerMutedTimed, {"{name}", "{time}"}, {targetName, time}))
+            rust.SendChatMessage(player, BuildOutput(messages.Admin.PlayerMutedTimed, {"{name}", "{time}"}, {targetName, time}))
         end
     end
     -- Send console log
-    if self.Config.Settings.General.LogToConsole == "true" then
+    if settings.General.LogToConsole == "true" then
         if not player then
-            printToConsole("[ChatMute] An admin muted "..targetName.." for "..muteTime.." "..timeUnitLong)
+            PrintToConsole("[ChatMute] An admin muted "..targetName.." for "..muteTime.." "..timeUnitLong)
         else
-            printToConsole("[ChatMute] "..player.displayName.." muted "..targetName.." for "..muteTime.." "..timeUnitLong)
+            PrintToConsole("[ChatMute] "..player.displayName.." muted "..targetName.." for "..muteTime.." "..timeUnitLong)
         end
     end
 end
@@ -457,8 +481,8 @@ end
 -- handles chat command /unmute
 -- --------------------------------
 function PLUGIN:cmdUnMute(player, cmd, args)
-    if not HasPermission(player, self.Config.Settings.Permissions.Mute) then
-        rust.SendChatMessage(player, self.Config.Messages.Admin.NoPermission)
+    if not HasPermission(player, settings.Permissions.Mute) then
+        rust.SendChatMessage(player, messages.Admin.NoPermission)
         return
     end
     local args = self:ArgsToTable(args, "chat")
@@ -473,13 +497,13 @@ function PLUGIN:cmdUnMute(player, cmd, args)
         local mutecount = #muteData
         muteData = {}
         datafile.SaveDataTable(muteList)
-        rust.SendChatMessage(player, buildOutput(self.Config.Messages.Admin.MutelistCleared, {"{count}"}, {tostring(mutecount)}))
+        rust.SendChatMessage(player, BuildOutput(messages.Admin.MutelistCleared, {"{count}"}, {tostring(mutecount)}))
         return
     end
     -- Try to get target netuser
     local numFound, targetPlayerTbl = FindPlayer(target, false)
     if numFound == 0 then
-        rust.SendChatMessage(player, self.Config.Messages.Admin.PlayerNotFound)
+        rust.SendChatMessage(player, messages.Admin.PlayerNotFound)
         return
     end
     if numFound > 1 then
@@ -487,7 +511,7 @@ function PLUGIN:cmdUnMute(player, cmd, args)
         for i = 1, numFound do
             targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
         end
-        rust.SendChatMessage(player, self.Config.Messages.Admin.MultiplePlayerFound)
+        rust.SendChatMessage(player, messages.Admin.MultiplePlayerFound)
         rust.SendChatMessage(player, targetNameString)
         return
     end
@@ -503,8 +527,8 @@ function PLUGIN:ccmdUnMute(arg)
         player = arg.connection.player
     end
     if player then F1Console = true end
-    if player and not HasPermission(player, self.Config.Settings.Permissions.Mute) then
-        arg:ReplyWith(self.Config.Messages.Admin.NoPermission)
+    if player and not HasPermission(player, settings.Permissions.Mute) then
+        arg:ReplyWith(messages.Admin.NoPermission)
         return true
     end
     local args = self:ArgsToTable(arg, "console")
@@ -513,7 +537,7 @@ function PLUGIN:ccmdUnMute(arg)
         if F1Console then
             arg:ReplyWith("Syntax: player.unmute <name/steamID> or player.unmute all to clear mutelist")
         else
-            printToConsole("Syntax: player.unmute <name/steamID> or player.unmute all to clear mutelist")
+            PrintToConsole("Syntax: player.unmute <name/steamID> or player.unmute all to clear mutelist")
         end
         return
     end
@@ -523,18 +547,18 @@ function PLUGIN:ccmdUnMute(arg)
         muteData = {}
         datafile.SaveDataTable(muteList)
         if F1Console then
-            arg:ReplyWith(buildOutput(self.Config.Messages.Admin.MutelistCleared, {"{count}"}, {tostring(mutecount)}))
+            arg:ReplyWith(BuildOutput(messages.Admin.MutelistCleared, {"{count}"}, {tostring(mutecount)}))
         else
-            printToConsole(buildOutput(self.Config.Messages.Admin.MutelistCleared, {"{count}"}, {tostring(mutecount)}))
+            PrintToConsole(BuildOutput(messages.Admin.MutelistCleared, {"{count}"}, {tostring(mutecount)}))
         end
         return
     end
     local numFound, targetPlayerTbl = FindPlayer(target, false)
     if numFound == 0 then
         if F1Console then
-            arg:ReplyWith(self.Config.Messages.Admin.PlayerNotFound)
+            arg:ReplyWith(messages.Admin.PlayerNotFound)
         else
-            printToConsole(self.Config.Messages.Admin.PlayerNotFound)
+            PrintToConsole(messages.Admin.PlayerNotFound)
         end
         return
     end
@@ -544,14 +568,14 @@ function PLUGIN:ccmdUnMute(arg)
             targetNameString = targetNameString..targetPlayerTbl[i].displayName..", "
         end
         if F1Console then
-            arg:ReplyWith(self.Config.Messages.Admin.MultiplePlayerFound)
+            arg:ReplyWith(messages.Admin.MultiplePlayerFound)
             for i = 1, numFound do
                 arg:ReplyWith(targetPlayerTbl[i].displayName)
             end
         else
-            printToConsole(self.Config.Messages.Admin.MultiplePlayerFound)
+            PrintToConsole(messages.Admin.MultiplePlayerFound)
             for i = 1, numFound do
-                printToConsole(targetPlayerTbl[i].displayName)
+                PrintToConsole(targetPlayerTbl[i].displayName)
             end
         end
         return
@@ -574,46 +598,47 @@ function PLUGIN:Unmute(player, targetPlayer, arg)
     if muteData[targetSteamID] then
         muteData[targetSteamID] = nil
         datafile.SaveDataTable(muteList)
+        targetPlayer:SetPlayerFlag(global.BasePlayer.PlayerFlags.VoiceMuted, false)
         -- Send unmute notice
-        if self.Config.Settings.General.BroadcastMutes == "true" then
-            rust.BroadcastChat(buildOutput(self.Config.Messages.Player.BroadcastUnmutes, {"{name}"}, {targetName}))
+        if settings.General.BroadcastMutes == "true" then
+            rust.BroadcastChat(BuildOutput(messages.Player.BroadcastUnmutes, {"{name}"}, {targetName}))
             if F1Console then
-                arg:ReplyWith(buildOutput(self.Config.Messages.Admin.PlayerUnmuted, {"{name}"}, {targetName}))
+                arg:ReplyWith(BuildOutput(messages.Admin.PlayerUnmuted, {"{name}"}, {targetName}))
             end
             if srvConsole then
-                printToConsole(buildOutput(self.Config.Messages.Admin.PlayerUnmuted, {"{name}"}, {targetName}))
+                PrintToConsole(BuildOutput(messages.Admin.PlayerUnmuted, {"{name}"}, {targetName}))
             end
         else
-            rust.SendChatMessage(targetPlayer, self.Config.Messages.Player.Unmuted)
+            rust.SendChatMessage(targetPlayer, messages.Player.Unmuted)
             if F1Console then
-                arg:ReplyWith(buildOutput(self.Config.Messages.Admin.PlayerUnmuted, {"{name}"}, {targetName}))
+                arg:ReplyWith(BuildOutput(messages.Admin.PlayerUnmuted, {"{name}"}, {targetName}))
             end
             if srvConsole then
-                printToConsole(buildOutput(self.Config.Messages.Admin.PlayerUnmuted, {"{name}"}, {targetName}))
+                PrintToConsole(BuildOutput(messages.Admin.PlayerUnmuted, {"{name}"}, {targetName}))
             end
             if chatCmd then
-                rust.SendChatMessage(player, buildOutput(self.Config.Messages.Admin.PlayerUnmuted, {"{name}"}, {targetName}))
+                rust.SendChatMessage(player, BuildOutput(messages.Admin.PlayerUnmuted, {"{name}"}, {targetName}))
             end
         end
         -- Send console log
-        if self.Config.Settings.General.LogToConsole == "true" then
+        if settings.General.LogToConsole == "true" then
             if player then
-                printToConsole("[ChatMute] "..player.displayName.." unmuted "..targetName)
+                PrintToConsole("[ChatMute] "..player.displayName.." unmuted "..targetName)
             else
-                printToConsole("[ChatMute] An admin unmuted "..targetName)
+                PrintToConsole("[ChatMute] An admin unmuted "..targetName)
             end
         end
         return
     end
     -- player is not muted
     if F1Console then
-        arg:ReplyWith(buildOutput(self.Config.Messages.Admin.PlayerNotMuted, {"{name}"}, {targetName}))
+        arg:ReplyWith(BuildOutput(messages.Admin.PlayerNotMuted, {"{name}"}, {targetName}))
     end
     if srvConsole then
-        printToConsole(buildOutput(self.Config.Messages.Admin.PlayerNotMuted, {"{name}"}, {targetName}))
+        PrintToConsole(BuildOutput(messages.Admin.PlayerNotMuted, {"{name}"}, {targetName}))
     end
     if chatCmd then
-        rust.SendChatMessage(player, buildOutput(self.Config.Messages.Admin.PlayerNotMuted, {"{name}"}, {targetName}))
+        rust.SendChatMessage(player, BuildOutput(messages.Admin.PlayerNotMuted, {"{name}"}, {targetName}))
     end
 end
 -- --------------------------------
@@ -626,8 +651,8 @@ function PLUGIN:OnRunCommand(arg)
     local msg = arg:GetString(0, "text")
     local player = arg.connection.player
     if cmd == "chat.say" and msg:sub(1, 1) ~= "/" then
-        if GlobalMute and not HasPermission(player, self.Config.Settings.Permissions.AntiGlobalMute) then
-            rust.SendChatMessage(player, self.Config.Messages.Player.GlobalMuted)
+        if GlobalMute and not HasPermission(player, settings.Permissions.AntiGlobalMute) then
+            rust.SendChatMessage(player, messages.Player.GlobalMuted)
             return true
         end
         local IsMuted = self:IsMuted(player)
@@ -640,10 +665,10 @@ function PLUGIN:OnRunCommand(arg)
             local minutes = tostring(math.floor(muteTime / 60 - (hours * 60))):format("%02.f")
             local seconds = tostring(math.floor(muteTime - (hours * 3600) - (minutes * 60))):format("%02.f")
             local expirationString = tostring(hours.."h "..minutes.."m "..seconds.."s")
-            rust.SendChatMessage(player, buildOutput(self.Config.Messages.Player.IsTimeMuted, {"{timeMuted}"}, {expirationString}))
+            rust.SendChatMessage(player, BuildOutput(messages.Player.IsTimeMuted, {"{timeMuted}"}, {expirationString}))
             return true
         else
-            rust.SendChatMessage(player, self.Config.Messages.Player.IsMuted)
+            rust.SendChatMessage(player, messages.Player.IsMuted)
             return true
         end
     end
