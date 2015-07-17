@@ -1,7 +1,7 @@
 PLUGIN.Title        = "Chat Handler"
 PLUGIN.Description  = "Chat modification and moderation suite"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(3, 1, 0)
+PLUGIN.Version      = V(3, 1, 2)
 PLUGIN.ResourceId   = 707
 
 local debugMode = false
@@ -35,8 +35,8 @@ end
 -- --------------------------------
 local function Debug(msg)
     if not debugMode then return end
-    --global.ServerConsole.PrintColoured(System.ConsoleColor.Yellow, msg)
-    UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({"[Debug] "..msg}))
+    global.ServerConsole.PrintColoured(System.ConsoleColor.Yellow, msg)
+    ConVar.Server.Log("Debug.ChatHandler.txt", msg.."\n")
 end
 -- --------------------------------
 -- permission check
@@ -64,24 +64,23 @@ end
 -- print functions
 -- --------------------------------
 local function PrintToConsole(msg)
-    --global.ServerConsole.PrintColoured(System.ConsoleColor.Cyan, msg)
-    UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({msg}))
+    global.ServerConsole.PrintColoured(System.ConsoleColor.Cyan, msg)
 end
 local function PrintToFile(msg)
     ConVar.Server.Log(LogFile, msg.."\n")
 end
 -- --------------------------------
--- splits chat messages longer than maxCharsPerLine characters into multilines
+-- splits chat messages longer than charlimit characters into multilines
 -- --------------------------------
-local function SplitLongMessages(msg, maxCharsPerLine)
+local function SplitLongMessages(msg, charlimit)
     local length = msg:len()
     local msgTbl = {}
     if length > 128 then
         msg = msg:sub(1, 128)
     end
-    if length > maxCharsPerLine then
-        while length > maxCharsPerLine do
-            local subStr = msg:sub(1, maxCharsPerLine)
+    if length > charlimit then
+        while length > charlimit do
+            local subStr = msg:sub(1, charlimit)
             local first, last = subStr:reverse():find(" ")
             if first then
                 subStr = subStr:sub(1, -first)
@@ -386,10 +385,12 @@ end
 -- handles chat messages
 -- --------------------------------
 function PLUGIN:OnPlayerChat(arg)
+    Debug("--- ChatHandler Debug ---")
     local msg = arg:GetString(0, "text")
     local player = arg.connection.player
     if msg:sub(1, 1) == "/" or msg == "" then return end
     local steamID = rust.UserIDFromPlayer(player)
+    Debug("Player: "..player.displayName.." ("..steamID..")")
     if eChatMute then
         local isMuted = eChatMute:Call("IsMuted", player)
         -- if muted abort chat handling and let chatmute handle chat canceling
@@ -419,8 +420,7 @@ function PLUGIN:OnPlayerChat(arg)
     if not canChat then
         if settings.Logging.LogBlockedMessages == "true" then
             if settings.Logging.LogToConsole == "true" then
-                --global.ServerConsole.PrintColoured(System.ConsoleColor.Cyan, errorPrefix, System.ConsoleColor.DarkYellow, " "..player.displayName..": ", System.ConsoleColor.DarkGreen, msg)
-                UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({errorPrefix.." "..player.displayName..": "..msg}))
+                global.ServerConsole.PrintColoured(System.ConsoleColor.Cyan, errorPrefix, System.ConsoleColor.DarkYellow, " "..player.displayName..": ", System.ConsoleColor.DarkGreen, msg)
             end
             if settings.Logging.LogToFile == "true" then
                 PrintToFile(errorPrefix.." "..steamID.."/"..player.displayName..": "..msg.."\n")
@@ -432,11 +432,15 @@ function PLUGIN:OnPlayerChat(arg)
         return false
     end
     -- Chat is ok and not blocked
-    local maxCharsPerLine = tonumber(settings.General.MaxCharsPerLine)
-    msg = SplitLongMessages(msg, maxCharsPerLine) -- msg is a table now
+    local charlimit = tonumber(settings.General.MaxCharsPerLine)
+    msg = SplitLongMessages(msg, charlimit) -- msg is a table now
     local i = 1
     while msg[i] do
         local username, message, logUsername, logMessage = self:BuildNameMessage(player, msg[i])
+        Debug("username: "..username)
+        Debug("message: "..message)
+        Debug("logUsername: "..logUsername)
+        Debug("logMessage: "..logMessage)
         self:SendChat(player, username, message, logUsername, logMessage)
         i = i + 1
     end
@@ -542,22 +546,37 @@ function PLUGIN:ParseChat(player, msg)
             end
         end
     end
+    -- Make html tags useless
+    msg = msg:gsub("<[cC][oO][lL][oO][rR]", "<\\color\\")
+    msg = msg:gsub("[cC][oO][lL][oO][rR]>", "\\color\\>")
+    msg = msg:gsub("<[sS][iI][zZ][eE]", "<\\size\\")
+    msg = msg:gsub("[sS][iI][zZ][eE]>", "\\size\\>")
+    msg = msg:gsub("<[mM][aA][tT][eE][rR][iI][aA][lL]", "<\\material\\")
+    msg = msg:gsub("[mM][aA][tT][eE][rR][iI][aA][lL]>", "\\material\\>")
+    msg = msg:gsub("<[qQ][uU][aA][dD]", "<\\quad\\")
+    msg = msg:gsub("[qQ][uU][aA][dD]>", "\\quad\\>")
+    msg = msg:gsub("<[bB]", "<\\b\\")
+    msg = msg:gsub("[bB]>", "\\b\\>")
+    msg = msg:gsub("<[iI]", "<\\i\\")
+    msg = msg:gsub("[iI]>", "\\i\\>")
     -- Check for blacklisted words
     if settings.Wordfilter.EnableWordfilter == "true" then
         for key, value in pairs(wordfilter) do
             local first, last = string.find(msg:lower(), key:lower(), nil, true)
             if first then
-                if type(value) == "table" and settings.Wordfilter.AllowPunish == "true" then
-                    -- kick, ban or mute for word usage
-                    if value[1]:lower() == "mute" then
-                        if eChatMute then
-                            eChatMute:Call("APIMute", steamID, 0)
-                            return false, msg, value[2], "[BLOCKED]"
+                if type(value) == "table" then
+                    if settings.Wordfilter.AllowPunish == "true" then
+                        -- kick, ban or mute for word usage
+                        if value[1]:lower() == "mute" then
+                            if eChatMute then
+                                eChatMute:Call("APIMute", steamID, 0)
+                                return false, msg, value[2], "[BLOCKED]"
+                            end
                         end
-                    end
-                    if value[1]:lower() == "kick" then
-                        Network.Net.sv:Kick(player.net.connection, value[2])
-                        return false, msg, false, "[BLOCKED]"
+                        if value[1]:lower() == "kick" then
+                            Network.Net.sv:Kick(player.net.connection, value[2])
+                            return false, msg, false, "[BLOCKED]"
+                        end
                     end
                 else
                     -- replace words
@@ -590,19 +609,6 @@ function PLUGIN:ParseChat(player, msg)
             end
         end
     end
-    -- Make html tags useless
-    msg = msg:gsub("<[cC][oO][lL][oO][rR]", "<\\color\\")
-    msg = msg:gsub("[cC][oO][lL][oO][rR]>", "\\color\\>")
-    msg = msg:gsub("<[sS][iI][zZ][eE]", "<\\size\\")
-    msg = msg:gsub("[sS][iI][zZ][eE]>", "\\size\\>")
-    msg = msg:gsub("<[mM][aA][tT][eE][rR][iI][aA][lL]", "<\\material\\")
-    msg = msg:gsub("[mM][aA][tT][eE][rR][iI][aA][lL]>", "\\material\\>")
-    msg = msg:gsub("<[qQ][uU][aA][dD]", "<\\quad\\")
-    msg = msg:gsub("[qQ][uU][aA][dD]>", "\\quad\\>")
-    msg = msg:gsub("<[bB]", "<\\b\\")
-    msg = msg:gsub("[bB]>", "\\b\\>")
-    msg = msg:gsub("<[iI]", "<\\i\\")
-    msg = msg:gsub("[iI]>", "\\i\\>")
 
     return true, msg, false, false
 end
@@ -682,6 +688,13 @@ function PLUGIN:BuildNameMessage(player, msg)
         message = "<color="..textColor..">: "..msg.."</color>"
     end
     ]]
+    -- remove color tags from log message (possibly used in wordfilter)
+    local tagStart, _ = logMessage:find("<color=", 1, true)
+    if tagStart then
+        local tagEnd, _ = logMessage:find(">", first, true)
+        logMessage = logMessage:sub(1, tagStart -1)..logMessage:sub(tagEnd + 1)
+        logMessage = logMessage:gsub("</color>", "")
+    end
     return username, message, logUsername, logMessage
 end
 -- --------------------------------
@@ -692,8 +705,8 @@ function PLUGIN:SendChat(player, name, msg, logName, logMsg)
     -- Broadcast chat ingame
     self:BroadcastChat(player, name, msg)
     -- Log chat to console
-    --global.ServerConsole.PrintColoured(System.ConsoleColor.DarkYellow, logName..": ", System.ConsoleColor.DarkGreen, logMsg)
-    UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({"[CHAT] "..logName..": "..logMsg}))
+    global.ServerConsole.PrintColoured(System.ConsoleColor.DarkYellow, logName..": ", System.ConsoleColor.DarkGreen, logMsg)
+    --UnityEngine.Debug.Log.methodarray[0]:Invoke(nil, util.TableToArray({"[CHAT] "..logName..": "..logMsg}))
     -- Log chat to log file
     ConVar.Server.Log("Log.Chat.txt", steamID.."/"..logName..": "..logMsg.."\n")
     -- Log chat history
