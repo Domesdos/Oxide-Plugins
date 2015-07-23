@@ -1,7 +1,7 @@
 PLUGIN.Title        = "FriendsAPI"
 PLUGIN.Description  = "An API to manage friends"
 PLUGIN.Author       = "#Domestos"
-PLUGIN.Version      = V(1, 2, 3)
+PLUGIN.Version      = V(1, 2, 4)
 PLUGIN.ResourceID   = 686
 
 local debugMode = false
@@ -60,32 +60,36 @@ end
 -- --------------------------------
 local function FindPlayer(NameOrIpOrSteamID, checkSleeper)
     local playerTbl = {}
-    local enumPlayerList = global.BasePlayer.activePlayerList:GetEnumerator()
-    while enumPlayerList:MoveNext() do
-        local currPlayer = enumPlayerList.Current
-        local currSteamID = rust.UserIDFromPlayer(currPlayer)
-        local currIP = currPlayer.net.connection.ipaddress
-        if currPlayer.displayName == NameOrIpOrSteamID or currSteamID == NameOrIpOrSteamID or currIP == NameOrIpOrSteamID then
-            table.insert(playerTbl, currPlayer)
-            return #playerTbl, playerTbl
-        end
-        local matched, _ = string.find(currPlayer.displayName:lower(), NameOrIpOrSteamID:lower(), 1, true)
-        if matched then
-            table.insert(playerTbl, currPlayer)
-        end
-    end
-    if checkSleeper then
-        local enumSleeperList = global.BasePlayer.sleepingPlayerList:GetEnumerator()
-        while enumSleeperList:MoveNext() do
-            local currPlayer = enumSleeperList.Current
+    local playerList = global.BasePlayer.activePlayerList:GetEnumerator()
+    while playerList:MoveNext() do
+        if playerList.Current then
+            local currPlayer = playerList.Current
             local currSteamID = rust.UserIDFromPlayer(currPlayer)
-            if currPlayer.displayName == NameOrIpOrSteamID or currSteamID == NameOrIpOrSteamID then
+            local currIP = currPlayer.net.connection.ipaddress
+            if currPlayer.displayName == NameOrIpOrSteamID or currSteamID == NameOrIpOrSteamID or currIP == NameOrIpOrSteamID then
                 table.insert(playerTbl, currPlayer)
                 return #playerTbl, playerTbl
             end
             local matched, _ = string.find(currPlayer.displayName:lower(), NameOrIpOrSteamID:lower(), 1, true)
             if matched then
                 table.insert(playerTbl, currPlayer)
+            end
+        end
+    end
+    if checkSleeper then
+        local sleeperList = global.BasePlayer.sleepingPlayerList:GetEnumerator()
+        while sleeperList:MoveNext() do
+            if sleeperList.Current then
+                local currPlayer = sleeperList.Current
+                local currSteamID = rust.UserIDFromPlayer(currPlayer)
+                if currPlayer.displayName == NameOrIpOrSteamID or currSteamID == NameOrIpOrSteamID then
+                    table.insert(playerTbl, currPlayer)
+                    return #playerTbl, playerTbl
+                end
+                local matched, _ = string.find(currPlayer.displayName:lower(), NameOrIpOrSteamID:lower(), 1, true)
+                if matched then
+                    table.insert(playerTbl, currPlayer)
+                end
             end
         end
     end
